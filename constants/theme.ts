@@ -1,29 +1,60 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * FaceFit - Beauty and Hair Services App
+ * Pinkish theme with modern design
  */
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// Primary pinkish colors
+const primaryPink = '#E91E63';
+const lightPink = '#F06292';
+const darkPink = '#C2185B';
+const accentPink = '#FF69B4';
 
+export const PINK = {
+  deep: '#7D2550',
+  mid: '#C2457A',
+  tint: '#FBEAF0',
+  accent: '#F4B8D1',
+  accentDark: '#E8A0BC',
+  white: '#FFFFFF',
+  textPrimary: '#1A0A11',
+  textMuted: '#9B7B8A',
+  border: '#E8D0DA',
+  cardBg: '#FAF4F7',
+  success: '#2E7D5A',
+  successBg: '#E8F5EE',
+};
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: '#1A1A1A',
+    background: '#FFFFFF',
+    tint: primaryPink,
+    icon: '#E91E63',
+    tabIconDefault: '#CCCCCC',
+    tabIconSelected: primaryPink,
+    primary: primaryPink,
+    secondary: lightPink,
+    accent: accentPink,
+    border: '#F0F0F0',
+    success: '#4CAF50',
+    warning: '#FF9800',
+    error: '#F44336',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: '#FFFFFF',
+    background: '#121212',
+    tint: lightPink,
+    icon: '#FF69B4',
+    tabIconDefault: '#666666',
+    tabIconSelected: lightPink,
+    primary: darkPink,
+    secondary: primaryPink,
+    accent: accentPink,
+    border: '#333333',
+    success: '#66BB6A',
+    warning: '#FFA726',
+    error: '#EF5350',
   },
 };
 
