@@ -1,16 +1,22 @@
+ feature/Ivan-dashboard-enhancement
 import { useMemo, useState } from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
+
+main
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/context/auth-context';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
+import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 export default function AdminDashboard() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { userName, logout } = useAuth();
+ feature/Ivan-dashboard-enhancement
   const colors = Colors[colorScheme ?? 'light'];
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -40,6 +46,9 @@ export default function AdminDashboard() {
       [item.title, item.detail, item.category].some((value) => value.toLowerCase().includes(query))
     );
   }, [searchQuery]);
+
+  const colors = Colors[(colorScheme ?? 'light') as 'light' | 'dark'];
+ main
 
   const handleLogout = () => {
     logout();
