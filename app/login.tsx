@@ -3,14 +3,14 @@ import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -92,7 +92,7 @@ export default function LoginScreen() {
           )}
 
           {/* ── Right panel – form ── */}
-          <View style={[styles.rightPanel, !isWide && { width: '100%' }]}>
+          <View style={[styles.rightPanel, !isWide && { width: '120%' }]}>
             {/* Mobile brand header */}
             {!isWide && (
               <View style={styles.mobileBrand}>
@@ -102,7 +102,7 @@ export default function LoginScreen() {
               </View>
             )}
 
-            <ThemedText style={styles.welcomeTitle}>Welcome back</ThemedText>
+            <ThemedText style={styles.welcomeTitle}>WELCOME BACK</ThemedText>
             <ThemedText style={styles.welcomeSub}>
               Sign in to your account to continue
             </ThemedText>
@@ -123,7 +123,7 @@ export default function LoginScreen() {
             <ThemedText style={styles.label}>Password</ThemedText>
             <View style={styles.pwWrap}>
               <TextInput
-                style={[styles.input, { paddingRight: 48, marginBottom: 0 }]}
+                style={[styles.input, { paddingRight: 49, marginBottom: 0 }]}
                 placeholder="••••••••"
                 placeholderTextColor={PINK.textMuted}
                 value={password}
