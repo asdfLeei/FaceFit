@@ -1,16 +1,43 @@
+import { SearchButton } from '@/components/search-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 
 export default function HairstylistDashboard() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { userName, logout } = useAuth();
   const colors = Colors[colorScheme ?? 'light'];
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    const searchableData = [
+      { title: 'Appointments', detail: '18 total this period', category: 'Stats' },
+      { title: 'Clients', detail: '42 active clients', category: 'Stats' },
+      { title: 'Rating', detail: '4.9 stars', category: 'Stats' },
+      { title: 'New Appointment', detail: 'Quick action', category: 'Actions' },
+      { title: 'Schedule', detail: 'View your calendar', category: 'Actions' },
+      { title: 'Emily Johnson', detail: 'Hair Cut & Color - 10:00 AM - Confirmed', category: 'Appointment' },
+      { title: 'Jessica Smith', detail: 'Hair Styling - 11:30 AM - Pending', category: 'Appointment' },
+      { title: 'Sarah Williams', detail: 'Makeup + Hair - 2:00 PM - Confirmed', category: 'Appointment' },
+      { title: "This Month's Earnings", detail: '$2,450.00', category: 'Earnings' },
+    ];
+
+    if (!query) {
+      return [];
+    }
+
+    return searchableData.filter((item) =>
+      [item.title, item.detail, item.category].some((value) => value.toLowerCase().includes(query))
+    );
+  }, [searchQuery]);
 
   const handleLogout = () => {
     logout();
@@ -66,6 +93,20 @@ export default function HairstylistDashboard() {
             <ThemedText style={styles.welcomeText}>Welcome back,</ThemedText>
             <ThemedText style={[styles.userName, { color: '#FFF' }]}>{userName}</ThemedText>
           </ThemedView>
+          <SearchButton
+            placeholder="Search clients, appointments, earnings..."
+            onSearch={setSearchQuery}
+            results={searchResults}
+            isSearching={searchQuery.length > 0}
+            searchQuery={searchQuery}
+            colors={{
+              primary: colors.primary,
+              text: colors.text,
+              border: colors.border,
+              background: colors.background,
+              surface: colors.border,
+            }}
+          />
           <TouchableOpacity
             style={[styles.logoutButton, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
             onPress={handleLogout}
@@ -73,6 +114,49 @@ export default function HairstylistDashboard() {
             <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>Logout</ThemedText>
           </TouchableOpacity>
         </ThemedView>
+
+        <ThemedView style={styles.searchSection}>
+          <TextInput
+            style={[
+              styles.searchInput,
+              {
+                backgroundColor: colors.border,
+                borderColor: colors.icon,
+                color: colors.text,
+              },
+            ]}
+            placeholder="Search clients, appointments, earnings..."
+            placeholderTextColor={colors.icon}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </ThemedView>
+
+        {searchQuery.trim().length > 0 && (
+          <ThemedView style={styles.section}>
+            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Search Results</ThemedText>
+            {searchResults.length > 0 ? (
+              searchResults.map((item, index) => (
+                <ThemedView
+                  key={`${item.title}-${index}`}
+                  style={[
+                    styles.searchResultCard,
+                    {
+                      backgroundColor: colors.border,
+                      borderColor: colors.icon,
+                    },
+                  ]}
+                >
+                  <ThemedText style={[styles.searchResultTitle, { color: colors.text }]}>{item.title}</ThemedText>
+                  <ThemedText style={[styles.searchResultDetail, { color: colors.icon }]}>{item.detail}</ThemedText>
+                  <ThemedText style={[styles.searchResultCategory, { color: colors.primary }]}>{item.category}</ThemedText>
+                </ThemedView>
+              ))
+            ) : (
+              <ThemedText style={[styles.searchEmptyText, { color: colors.icon }]}>No matches found.</ThemedText>
+            )}
+          </ThemedView>
+        )}
 
         {/* Performance Stats */}
         <ThemedView style={styles.statsContainer}>
@@ -206,11 +290,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 6,
   },
+  searchSection: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    marginBottom: 16,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 13,
+  },
   statsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
     paddingVertical: 20,
-    justifyContent: 'space-between',
+    gap: 12,
   },
   statCard: {
     flex: 1,
@@ -237,7 +333,7 @@ const styles = StyleSheet.create({
   },
   actionsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
   },
   actionButton: {
     flex: 1,
@@ -300,5 +396,28 @@ const styles = StyleSheet.create({
   earningsSubtext: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
+  },
+  searchResultCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+  searchResultTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  searchResultDetail: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  searchResultCategory: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  searchEmptyText: {
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });
