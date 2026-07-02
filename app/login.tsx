@@ -1,18 +1,17 @@
+import { ThemedText } from '@/components/themed-text';
+import { useAuth } from '@/context/auth-context';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
+  Dimensions,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Dimensions,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { useAuth } from '@/context/auth-context';
 
 const { width } = Dimensions.get('window');
 const isWide = width > 768;
@@ -93,7 +92,7 @@ export default function LoginScreen() {
           )}
 
           {/* ── Right panel – form ── */}
-          <View style={[styles.rightPanel, !isWide && { width: '100%' }]}>
+          <View style={[styles.rightPanel, !isWide && { width: '120%' }]}>
             {/* Mobile brand header */}
             {!isWide && (
               <View style={styles.mobileBrand}>
@@ -103,7 +102,7 @@ export default function LoginScreen() {
               </View>
             )}
 
-            <ThemedText style={styles.welcomeTitle}>Welcome back</ThemedText>
+            <ThemedText style={styles.welcomeTitle}>WELCOME BACK</ThemedText>
             <ThemedText style={styles.welcomeSub}>
               Sign in to your account to continue
             </ThemedText>
@@ -124,7 +123,7 @@ export default function LoginScreen() {
             <ThemedText style={styles.label}>Password</ThemedText>
             <View style={styles.pwWrap}>
               <TextInput
-                style={[styles.input, { paddingRight: 48, marginBottom: 0 }]}
+                style={[styles.input, { paddingRight: 49, marginBottom: 0 }]}
                 placeholder="••••••••"
                 placeholderTextColor={PINK.textMuted}
                 value={password}
@@ -243,7 +242,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 12,
   },
-  testimonialAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  testimonialAuthorRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
     width: 30,
     height: 30,
@@ -320,21 +319,13 @@ const styles = StyleSheet.create({
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
     marginBottom: 16,
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: PINK.border },
   dividerText: { fontSize: 12, color: PINK.textMuted },
-  demoBtns: { flexDirection: 'row', gap: 8, marginBottom: 28 },
-  demoBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: PINK.border,
-    alignItems: 'center',
-    backgroundColor: PINK.inputBg,
-  },
+  demoBtns: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 28 },
+  demoBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: PINK.border, alignItems: 'center', backgroundColor: PINK.inputBg, marginHorizontal: 6 },
+  
   demoBtnText: { fontSize: 13, color: PINK.textMuted, fontWeight: '500' },
   signupRow: {
     flexDirection: 'row',

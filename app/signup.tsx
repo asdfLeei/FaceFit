@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import {
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  View,
-} from 'react-native';
-import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth, type UserRole } from '@/context/auth-context';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import {
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 const PINK = {
   deep: '#7D2550',
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   },
 
   /* Role cards */
-  roleGrid: { gap: 12, marginBottom: 28 },
+  roleGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 28 },
   roleCard: {
     borderWidth: 1.5,
     borderColor: PINK.border,
