@@ -1,23 +1,18 @@
- feature/Ivan-dashboard-enhancement
-import { useMemo, useState } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
-
-main
+import { SearchButton } from '@/components/search-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 
 export default function AdminDashboard() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { userName, logout } = useAuth();
- feature/Ivan-dashboard-enhancement
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = Colors[(colorScheme ?? 'light') as 'light' | 'dark'];
   const [searchQuery, setSearchQuery] = useState('');
 
   const searchResults = useMemo(() => {
@@ -46,9 +41,6 @@ export default function AdminDashboard() {
       [item.title, item.detail, item.category].some((value) => value.toLowerCase().includes(query))
     );
   }, [searchQuery]);
-
-  const colors = Colors[(colorScheme ?? 'light') as 'light' | 'dark'];
- main
 
   const handleLogout = () => {
     logout();
@@ -86,6 +78,20 @@ export default function AdminDashboard() {
             <ThemedText style={styles.welcomeText}>Welcome Admin,</ThemedText>
             <ThemedText style={[styles.userName, { color: '#FFF' }]}>{userName}</ThemedText>
           </ThemedView>
+          <SearchButton
+            placeholder="Search admin data, users, activities..."
+            onSearch={setSearchQuery}
+            results={searchResults}
+            isSearching={searchQuery.length > 0}
+            searchQuery={searchQuery}
+            colors={{
+              primary: colors.primary,
+              text: colors.text,
+              border: colors.border,
+              background: colors.background,
+              surface: colors.border,
+            }}
+          />
           <TouchableOpacity
             style={[styles.logoutButton, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
             onPress={handleLogout}

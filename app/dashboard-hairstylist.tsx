@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import { SearchButton } from '@/components/search-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/context/auth-context';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 
 export default function HairstylistDashboard() {
   const router = useRouter();
@@ -92,6 +93,20 @@ export default function HairstylistDashboard() {
             <ThemedText style={styles.welcomeText}>Welcome back,</ThemedText>
             <ThemedText style={[styles.userName, { color: '#FFF' }]}>{userName}</ThemedText>
           </ThemedView>
+          <SearchButton
+            placeholder="Search clients, appointments, earnings..."
+            onSearch={setSearchQuery}
+            results={searchResults}
+            isSearching={searchQuery.length > 0}
+            searchQuery={searchQuery}
+            colors={{
+              primary: colors.primary,
+              text: colors.text,
+              border: colors.border,
+              background: colors.background,
+              surface: colors.border,
+            }}
+          />
           <TouchableOpacity
             style={[styles.logoutButton, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
             onPress={handleLogout}

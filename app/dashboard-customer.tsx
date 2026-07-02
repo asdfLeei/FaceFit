@@ -1,17 +1,7 @@
-feature/Ivan-dashboard-enhancement
-import { useState } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
-import { TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-main
+import { SearchButton } from '@/components/search-button';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Dimensions,
   ScrollView,
@@ -22,50 +12,6 @@ import {
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
-
-feature/Ivan-dashboard-enhancement
-export default function CustomerDashboard() {
-  const router = useRouter();
-  const colorScheme = useColorScheme();
-  const { userName, logout } = useAuth();
-  const colors = Colors[colorScheme ?? 'light'];
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'analysis' | 'salons' | 'plans'>('dashboard');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const searchableData = {
-    dashboard: [
-      { title: 'Skin Analysis', detail: 'AI-powered skin assessment', category: 'Feature' },
-      { title: 'Makeup Tips', detail: 'Personalized beauty guides', category: 'Feature' },
-      { title: 'Hair Therapy', detail: 'Professional hair care', category: 'Feature' },
-      { title: 'Style Advice', detail: 'Expert styling tips', category: 'Feature' },
-      { title: 'Hair Cut with Sarah', detail: 'Dec 22, 2024 - 2:00 PM', category: 'Recent Booking' },
-    ],
-    analysis: [
-      { title: 'Skin Texture', detail: 'Smooth and healthy', category: 'Metric' },
-      { title: 'Hydration Level', detail: 'Excellent', category: 'Metric' },
-      { title: 'Elasticity', detail: 'Very good', category: 'Metric' },
-      { title: 'Pigmentation', detail: 'Well balanced', category: 'Metric' },
-    ],
-    salons: [
-      { title: 'Glamour Studio', detail: '4.9 stars - 2.5 km', category: 'Salon' },
-      { title: 'Hair Haven', detail: '4.8 stars - 1.2 km', category: 'Salon' },
-      { title: 'Beauty Lounge', detail: '4.7 stars - 3.1 km', category: 'Salon' },
-      { title: 'Style Masters', detail: '4.9 stars - 0.8 km', category: 'Salon' },
-    ],
-    plans: [
-      { title: 'Basic', detail: '$9.99/mo - 2 salon visits', category: 'Plan' },
-      { title: 'Premium', detail: '$19.99/mo - Unlimited visits', category: 'Plan' },
-      { title: 'Elite', detail: '$29.99/mo - VIP access', category: 'Plan' },
-    ],
-  };
-
-  const searchResults = searchQuery.trim().length
-    ? searchableData[activeTab].filter((item) =>
-        [item.title, item.detail, item.category].some((value) =>
-          value.toLowerCase().includes(searchQuery.trim().toLowerCase())
-        )
-      )
-    : [];
 
 // ── Brand tokens ────────────────────────────────────────────
 const C = {
@@ -83,7 +29,6 @@ const C = {
   white: '#FFFFFF',
   success: '#C2457A',
 };
- main
 
 type Tab = 'dashboard' | 'analysis' | 'salons' | 'plans';
 
@@ -410,6 +355,29 @@ export default function CustomerDashboard() {
   const router = useRouter();
   const { userName, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const searchableData = [
+    { title: 'Your Face Analysis', detail: 'View your facial geometry and characteristics', category: 'Analysis' },
+    { title: 'Recommended Styles', detail: 'Hairstyles tailored to your face shape', category: 'Salons' },
+    { title: 'Find a Salon', detail: 'Browse nearby salons and professionals', category: 'Salons' },
+    { title: 'My Bookings', detail: 'Manage your appointments and reservations', category: 'Bookings' },
+    { title: 'Beauty Plans', detail: 'Explore personalized beauty care plans', category: 'Plans' },
+    { title: 'Skin Analysis', detail: 'Get AI-powered texture, hydration & tone analysis', category: 'Features' },
+    { title: 'Makeup Tips', detail: 'Chromatographic palettes for your undertone', category: 'Features' },
+    { title: 'Hair Therapy', detail: 'Professional care for your hair structure', category: 'Features' },
+    { title: 'Style Advice', detail: 'Styling anchored in facial geometry', category: 'Features' },
+  ];
+
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return [];
+    return searchableData.filter((item) =>
+      [item.title, item.detail, item.category].some((value) =>
+        value.toLowerCase().includes(query)
+      )
+    );
+  }, [searchQuery]);
 
   const handleLogout = () => {
     logout();
@@ -426,6 +394,20 @@ export default function CustomerDashboard() {
         </View>
         <View style={s.headerRight}>
           <Text style={s.brandMark}>FACE-FIT</Text>
+          <SearchButton
+            placeholder="Search features, salons, bookings..."
+            onSearch={setSearchQuery}
+            results={searchResults}
+            isSearching={searchQuery.length > 0}
+            searchQuery={searchQuery}
+            colors={{
+              primary: C.primary,
+              text: C.text,
+              border: C.border,
+              background: C.bg,
+              surface: C.surface,
+            }}
+          />
           <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.75}>
             <Text style={s.logoutText}>Logout</Text>
           </TouchableOpacity>
@@ -435,57 +417,10 @@ export default function CustomerDashboard() {
       {/* ── Tabs ── */}
       <TabBar active={activeTab} onChange={setActiveTab} />
 
-feature/Ivan-dashboard-enhancement
-        <ThemedView style={styles.searchSection}>
-          <TextInput
-            style={[
-              styles.searchInput,
-              {
-                backgroundColor: colors.border,
-                borderColor: colors.icon,
-                color: colors.text,
-              },
-            ]}
-            placeholder={`Search ${activeTab} data...`}
-            placeholderTextColor={colors.icon}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </ThemedView>
-
-        {searchQuery.trim().length > 0 && (
-          <ThemedView style={styles.section}>
-            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Search Results</ThemedText>
-            {searchResults.length > 0 ? (
-              searchResults.map((item, index) => (
-                <ThemedView
-                  key={`${item.title}-${index}`}
-                  style={[
-                    styles.searchResultCard,
-                    {
-                      backgroundColor: colors.border,
-                      borderColor: colors.icon,
-                    },
-                  ]}
-                >
-                  <ThemedText style={[styles.searchResultTitle, { color: colors.text }]}>{item.title}</ThemedText>
-                  <ThemedText style={[styles.searchResultDetail, { color: colors.icon }]}>{item.detail}</ThemedText>
-                  <ThemedText style={[styles.searchResultCategory, { color: colors.primary }]}>{item.category}</ThemedText>
-                </ThemedView>
-              ))
-            ) : (
-              <ThemedText style={[styles.searchEmptyText, { color: colors.icon }]}>No matches found.</ThemedText>
-            )}
-          </ThemedView>
-        )}
-
-        {/* Dashboard Tab */}
-
       {/* ── Content ── */}
       <ScrollView style={{ flex: 1, backgroundColor: C.bg }} showsVerticalScrollIndicator={false}>
 
         {/* Dashboard tab */}
- main
         {activeTab === 'dashboard' && (
           <View style={s.page}>
 
@@ -577,62 +512,9 @@ const s = StyleSheet.create({
 
   // Header
   header: {
-feature/Ivan-dashboard-enhancement
-    padding: 20,
-    paddingTop: 40,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  welcomeText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 13,
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  logoutButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    paddingHorizontal: 20,
-  },
-  searchSection: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    marginBottom: 4,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 13,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabButtonText: {
-    fontSize: 13,
-    letterSpacing: 0.3,
-  },
-  tabContent: {
-    paddingBottom: 40,
-  },
-  section: {
-
     backgroundColor: C.primary,
     paddingTop: 56,
     paddingBottom: 12,
-main
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -713,51 +595,7 @@ main
   featureDesc: { fontSize: 11, lineHeight: 16 },
 
   // Booking cards
-  bookingCard: {
-feature/Ivan-dashboard-enhancement
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  bookingTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  bookingDate: {
-    fontSize: 11,
-  },
-  searchResultCard: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-  },
-  searchResultTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  searchResultDetail: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  searchResultCategory: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  searchEmptyText: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: C.surface, borderRadius: 14, padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: C.border,
-  },
+  bookingCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.border },
   bookingAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   bookingTitle: { fontSize: 13, fontWeight: '800', color: C.text, marginBottom: 2 },
   bookingMeta: { fontSize: 11, color: C.textMid },
@@ -769,5 +607,4 @@ feature/Ivan-dashboard-enhancement
   placeholderIcon: { fontSize: 40, marginBottom: 16 },
   placeholderTitle: { fontSize: 18, fontWeight: '800', color: C.text, textAlign: 'center', marginBottom: 8 },
   placeholderBody: { fontSize: 13, color: C.textMid, textAlign: 'center', lineHeight: 20 },
-main
 });
