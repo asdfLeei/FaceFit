@@ -1,4 +1,8 @@
 {
+feature/Ivan-dashboard-enhancement
+  "extends": "expo/tsconfig.base.json",
+
+ main
   "compilerOptions": {
     "strict": true,
     "jsx": "react-jsx",
