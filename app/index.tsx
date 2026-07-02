@@ -1,11 +1,11 @@
 import { ThemedText } from '@/components/themed-text';
 import { useRouter } from 'expo-router';
 import {
-  Dimensions,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -199,7 +199,6 @@ const styles = StyleSheet.create({
   featuresContainer: {
     paddingHorizontal: 16,
     paddingVertical: 40,
-    gap: 16,
     maxWidth: 500,
     alignSelf: 'center',
     width: '100%',
@@ -212,6 +211,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: PINK.border,
+    marginBottom: 16,
   },
   featureIconLarge: {
     fontSize: 48,
@@ -256,7 +256,6 @@ const styles = StyleSheet.create({
   testimonialAuthor: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
   avatar: {
     width: 40,
@@ -265,6 +264,7 @@ const styles = StyleSheet.create({
     backgroundColor: PINK.mid,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
   avatarText: {
     color: PINK.white,
@@ -288,7 +288,6 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     alignSelf: 'center',
     width: '100%',
-    gap: 12,
   },
   primaryBtn: {
     backgroundColor: PINK.mid,

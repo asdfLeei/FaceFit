@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/context/auth-context';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Dimensions, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -235,9 +235,14 @@ export default function CustomerDashboard() {
               ]}
             >
               <ThemedView style={styles.heroContent}>
-                <ThemedText style={styles.heroTitle}>Your Face,</ThemedText>
-                <ThemedText style={styles.heroTitleHighlight}>Perfectly Decoded</ThemedText>
-                <ThemedText style={styles.heroDescription}>
+                <ThemedText style={[styles.heroTitle, { color: colors.text }]}>Your Face,</ThemedText>
+                <ThemedText style={[styles.heroTitleHighlight, { color: colors.primary }]}>Perfectly Decoded</ThemedText>
+                <ThemedText
+                  style={[
+                    styles.heroDescription,
+                    { color: colorScheme === 'dark' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.7)' },
+                  ]}
+                >
                   Discover personalized beauty recommendations based on your unique features
                 </ThemedText>
               </ThemedView>
@@ -546,18 +551,15 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#000',
     marginBottom: 4,
   },
   heroTitleHighlight: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#E91E63',
     marginBottom: 12,
   },
   heroDescription: {
     fontSize: 13,
-    color: 'rgba(0,0,0,0.7)',
     lineHeight: 20,
   },
   heroImage: {
@@ -573,13 +575,14 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   statCard: {
     flex: 1,
     padding: 14,
     borderRadius: 12,
     alignItems: 'center',
+    marginHorizontal: 6,
   },
   statNumber: {
     fontSize: 18,
@@ -593,18 +596,19 @@ const styles = StyleSheet.create({
   featuresGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   detectionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   featureCard: {
     width: '48%',
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
+    marginBottom: 12,
   },
   featureIcon: {
     fontSize: 32,
@@ -639,13 +643,14 @@ const styles = StyleSheet.create({
   analysisProgress: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   progressBar: {
     flex: 1,
     height: 8,
     backgroundColor: 'rgba(255,255,255,0.3)',
     borderRadius: 4,
+    marginRight: 12,
   },
   analysisScore: {
     color: '#FFF',
@@ -655,7 +660,7 @@ const styles = StyleSheet.create({
   salonsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   salonCard: {
     width: '48%',
@@ -711,7 +716,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   plansContainer: {
-    gap: 16,
+    // spacing handled by individual plan cards
   },
   planCard: {
     borderRadius: 16,
@@ -747,11 +752,11 @@ const styles = StyleSheet.create({
   planFeatures: {
     width: '100%',
     marginBottom: 16,
-    gap: 8,
   },
   planFeature: {
     fontSize: 12,
     lineHeight: 18,
+    marginBottom: 8,
   },
   planButton: {
     width: '100%',
