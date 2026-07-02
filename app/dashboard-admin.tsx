@@ -1,4 +1,5 @@
-import { StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useMemo, useState } from 'react';
+import { StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -11,6 +12,34 @@ export default function AdminDashboard() {
   const colorScheme = useColorScheme();
   const { userName, logout } = useAuth();
   const colors = Colors[colorScheme ?? 'light'];
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    const searchableData = [
+      { title: 'Active Users', detail: '156 total users', category: 'System Overview' },
+      { title: 'Hairstylists', detail: '42 verified stylists', category: 'System Overview' },
+      { title: 'Appointments', detail: '328 total bookings', category: 'System Overview' },
+      { title: 'Revenue', detail: '$9,840 this month', category: 'System Overview' },
+      { title: 'Manage Users', detail: 'Create, update, or suspend users', category: 'Management' },
+      { title: 'Manage Stylists', detail: 'Verify and maintain stylist accounts', category: 'Management' },
+      { title: 'Manage Services', detail: 'Update available salon services', category: 'Management' },
+      { title: 'Support Tickets', detail: 'Review and resolve support issues', category: 'Management' },
+      { title: 'New user registration', detail: '2 minutes ago', category: 'Recent Activity' },
+      { title: 'New hairstylist verification', detail: '15 minutes ago', category: 'Recent Activity' },
+      { title: 'Support ticket resolved', detail: '1 hour ago', category: 'Recent Activity' },
+      { title: 'System Health', detail: 'All systems operational', category: 'Status' },
+    ];
+
+    if (!query) {
+      return [];
+    }
+
+    return searchableData.filter((item) =>
+      [item.title, item.detail, item.category].some((value) => value.toLowerCase().includes(query))
+    );
+  }, [searchQuery]);
 
   const handleLogout = () => {
     logout();
@@ -55,6 +84,49 @@ export default function AdminDashboard() {
             <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>Logout</ThemedText>
           </TouchableOpacity>
         </ThemedView>
+
+        <ThemedView style={styles.searchSection}>
+          <TextInput
+            style={[
+              styles.searchInput,
+              {
+                backgroundColor: colors.border,
+                borderColor: colors.icon,
+                color: colors.text,
+              },
+            ]}
+            placeholder="Search admin data, users, activities..."
+            placeholderTextColor={colors.icon}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </ThemedView>
+
+        {searchQuery.trim().length > 0 && (
+          <ThemedView style={styles.section}>
+            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Search Results</ThemedText>
+            {searchResults.length > 0 ? (
+              searchResults.map((item, index) => (
+                <ThemedView
+                  key={`${item.title}-${index}`}
+                  style={[
+                    styles.searchResultCard,
+                    {
+                      backgroundColor: colors.border,
+                      borderColor: colors.icon,
+                    },
+                  ]}
+                >
+                  <ThemedText style={[styles.searchResultTitle, { color: colors.text }]}>{item.title}</ThemedText>
+                  <ThemedText style={[styles.searchResultDetail, { color: colors.icon }]}>{item.detail}</ThemedText>
+                  <ThemedText style={[styles.searchResultCategory, { color: colors.primary }]}>{item.category}</ThemedText>
+                </ThemedView>
+              ))
+            ) : (
+              <ThemedText style={[styles.searchEmptyText, { color: colors.icon }]}>No matches found.</ThemedText>
+            )}
+          </ThemedView>
+        )}
 
         {/* System Overview */}
         <ThemedView style={styles.section}>
@@ -246,6 +318,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 6,
   },
+  searchSection: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    marginBottom: 16,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 13,
+  },
   section: {
     paddingHorizontal: 20,
     marginBottom: 24,
@@ -340,5 +424,28 @@ const styles = StyleSheet.create({
   healthDetails: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
+  },
+  searchResultCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+  searchResultTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  searchResultDetail: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  searchResultCategory: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  searchEmptyText: {
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });
