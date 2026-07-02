@@ -1,16 +1,16 @@
-import { StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/context/auth-context';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
+import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 export default function AdminDashboard() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { userName, logout } = useAuth();
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = Colors[(colorScheme ?? 'light') as 'light' | 'dark'];
 
   const handleLogout = () => {
     logout();
