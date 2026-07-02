@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  blob1: { width: 220, height: 220, bottom: -60, left: -60 },
+  blob1: { width: 230, height: 230, bottom: -60, left: -60 },
   blob2: { width: 160, height: 160, top: 80, left: -80 },
   brandBlock: { zIndex: 1 },
   brandName: {
