@@ -1,337 +1,217 @@
-import { ThemedText } from '@/components/themed-text';
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
+import { FaceScanScreen } from '@/components/face-scan-screen';
+import { LocationMap, type MapCoordinate } from '@/components/location-map';
+import { OnboardingScreen } from '@/components/onboarding-screen';
 import {
-    Dimensions,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { width, height } = Dimensions.get('window');
-const isWide = width > 768;
+type Screen =
+  | 'splash' | 'onboarding' | 'login' | 'signup' | 'consent' | 'home'
+  | 'scan' | 'processing' | 'result' | 'recommendations' | 'style-detail'
+  | 'salons' | 'salon-detail' | 'service' | 'stylist' | 'datetime' | 'summary' | 'success'
+  | 'bookings' | 'profile' | 'saved' | 'notifications' | 'reviews' | 'settings'
+  | 'stylist-dashboard' | 'stylist-appointments' | 'stylist-detail' | 'stylist-status' | 'stylist-notifications'
+  | 'owner-dashboard' | 'owner-bookings' | 'owner-services' | 'owner-staff' | 'owner-profile' | 'owner-reviews';
 
-const PINK = {
-  deep: '#7D2550',
-  mid: '#C2457A',
-  tint: '#FBEAF0',
-  accent: '#F4B8D1',
-  white: '#FFFFFF',
-  textMuted: '#9B7B8A',
-  border: '#E8D0DA',
-  inputBg: '#FAF4F7',
-  dark: '#4B1528',
-  light: '#F9E5ED',
-};
+const C = { rose: '#A94F67', roseDark: '#743548', blush: '#F7E4E8', pale: '#FFF8F6', ink: '#292326', muted: '#7C7074', line: '#EDE3E5', white: '#FFFFFF', green: '#4F826B', gold: '#C48B3A' };
+const artwork = require('../assets/images/facefit-styles.png');
+const stylesList = [
+  { name: 'Soft Layered Lob', match: '96%', reason: 'Frames an oval face without hiding its balance.' },
+  { name: 'Textured Pixie', match: '92%', reason: 'Adds lift and highlights your cheekbones.' },
+  { name: 'Curly Shag', match: '89%', reason: 'Soft volume complements your natural proportions.' },
+  { name: 'Curtain Layers', match: '86%', reason: 'Face-framing movement creates gentle definition.' },
+];
 
-export default function HomeScreen() {
-  const router = useRouter();
-
-  return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: PINK.white }}
-      contentContainerStyle={{ flexGrow: 1 }}
-    >
-      {/* ──────────────────── HERO SECTION ──────────────────── */}
-      <View style={styles.heroSection}>
-        {/* Gradient decorative blob */}
-        <View style={[styles.blob, styles.blob1]} />
-        <View style={[styles.blob, styles.blob2]} />
-
-        {/* Brand */}
-        <View style={styles.brandContainer}>
-          <ThemedText style={styles.brandName}>
-            Face<ThemedText style={styles.brandAccent}>Fit</ThemedText>
-          </ThemedText>
-          <ThemedText style={styles.brandTagline}>
-            Your Beauty & Hair Solution
-          </ThemedText>
-        </View>
-
-        {/* Hero text */}
-        <View style={styles.heroText}>
-          <ThemedText style={styles.heroTitle}>Transform Your Look</ThemedText>
-          <ThemedText style={styles.heroSub}>
-            Discover top-rated beauty & hair professionals, book appointments with ease, and enjoy quality services—all in one app.
-          </ThemedText>
-        </View>
-      </View>
-
-      {/* ──────────────────── FEATURES SECTION ──────────────────── */}
-      <View style={styles.featuresContainer}>
-        <View style={styles.featureCard}>
-          <ThemedText style={styles.featureIconLarge}>✨</ThemedText>
-          <ThemedText style={styles.featureTitle}>Find Services</ThemedText>
-          <ThemedText style={styles.featureDescription}>
-            Discover professional beauty & hair services near you
-          </ThemedText>
-        </View>
-
-        <View style={styles.featureCard}>
-          <ThemedText style={styles.featureIconLarge}>📅</ThemedText>
-          <ThemedText style={styles.featureTitle}>Book Easily</ThemedText>
-          <ThemedText style={styles.featureDescription}>
-            Schedule appointments at your convenience
-          </ThemedText>
-        </View>
-
-        <View style={styles.featureCard}>
-          <ThemedText style={styles.featureIconLarge}>⭐</ThemedText>
-          <ThemedText style={styles.featureTitle}>Quality Service</ThemedText>
-          <ThemedText style={styles.featureDescription}>
-            Connect with top-rated professionals
-          </ThemedText>
-        </View>
-      </View>
-
-      {/* ──────────────────── TESTIMONIAL ──────────────────── */}
-      <View style={styles.testimonialSection}>
-        <View style={styles.testimonialCard}>
-          <ThemedText style={styles.testimonialQuote}>
-            "FaceFit made booking my appointments so easy. The interface is beautiful and I found amazing stylists in minutes!"
-          </ThemedText>
-          <View style={styles.testimonialAuthor}>
-            <View style={styles.avatar}>
-              <ThemedText style={styles.avatarText}>SN</ThemedText>
-            </View>
-            <View>
-              <ThemedText style={styles.authorName}>Sarah N.</ThemedText>
-              <ThemedText style={styles.authorRole}>Client</ThemedText>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* ──────────────────── CTA SECTION ──────────────────── */}
-      <View style={styles.ctaSection}>
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={() => router.push('/login')}
-        >
-          <ThemedText style={styles.primaryBtnText}>Login</ThemedText>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.secondaryBtn}
-          onPress={() => router.push('/signup')}
-        >
-          <ThemedText style={styles.secondaryBtnText}>Sign Up</ThemedText>
-        </TouchableOpacity>
-      </View>
-
-      {/* ──────────────────── FOOTER ──────────────────── */}
-      <View style={styles.footer}>
-        <ThemedText style={styles.footerText}>
-          © 2024 FaceFit. All rights reserved.
-        </ThemedText>
-      </View>
-    </ScrollView>
-  );
+function Button({ label, onPress, secondary = false, icon, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; icon?: keyof typeof Ionicons.glyphMap; disabled?: boolean }) {
+  return <Pressable disabled={disabled} accessibilityRole="button" accessibilityState={{ disabled }} onPress={onPress} style={({ pressed }) => [s.button, secondary && s.buttonSecondary, disabled && s.buttonDisabled, pressed && s.pressed]}>
+    {icon && <Ionicons name={icon} size={19} color={secondary ? C.rose : C.white} />}
+    <Text style={[s.buttonText, secondary && s.buttonTextSecondary]}>{label}</Text>
+  </Pressable>;
 }
 
-const styles = StyleSheet.create({
-  heroSection: {
-    backgroundColor: PINK.deep,
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 40,
-    overflow: 'hidden',
-    position: 'relative',
-    alignItems: 'center',
+function Header({ title, onBack, action }: { title: string; onBack?: () => void; action?: keyof typeof Ionicons.glyphMap }) {
+  return <View style={s.header}>
+    {onBack ? <Pressable onPress={onBack} style={s.iconButton}><Ionicons name="chevron-back" size={22} color={C.ink} /></Pressable> : <View style={s.logoSmall}><Text style={s.logoMark}>F</Text></View>}
+    <Text style={s.headerTitle}>{title}</Text>
+    <View style={s.iconButton}>{action && <Ionicons name={action} size={21} color={C.ink} />}</View>
+  </View>;
+}
 
-  },
-  blob: {
-    position: 'absolute',
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  blob1: {
-    width: 200,
-    height: 200,
-    bottom: -50,
-    left: -50,
-  },
-  blob2: {
-    width: 150,
-    height: 150,
-    top: 40,
-    right: -30,
-  },
-  brandContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-    zIndex: 1,
-  },
-  brandName: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: PINK.white,
-    letterSpacing: -0.8,
-  },
-  brandAccent: {
-    color: PINK.accent,
-  },
-  brandTagline: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 6,
-  },
-  heroText: {
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: PINK.white,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  heroSub: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    lineHeight: 21,
-    maxWidth: '90%',
-  },
+function SectionTitle({ title, action, onAction, actionLoading = false }: { title: string; action?: string; onAction?: () => void; actionLoading?: boolean }) {
+  return <View style={s.sectionHead}><Text style={s.sectionTitle}>{title}</Text>{action && (onAction ? <Pressable accessibilityRole="button" disabled={actionLoading} onPress={onAction} style={({ pressed }) => [s.sectionAction, pressed && s.pressed]}>{actionLoading ? <ActivityIndicator size="small" color={C.rose} /> : <><Text style={s.link}>{action}</Text><Ionicons name="map-outline" size={17} color={C.rose} /></>}</Pressable> : <Text style={s.link}>{action}</Text>)}</View>;
+}
 
-  /* Features */
-  featuresContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 40,
-    maxWidth: 500,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  featureCard: {
-    backgroundColor: PINK.light,
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: PINK.border,
-    marginBottom: 16,
-  },
-  featureIconLarge: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  featureTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: PINK.dark,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  featureDescription: {
-    fontSize: 13,
-    color: PINK.textMuted,
-    textAlign: 'center',
-    lineHeight: 19,
-  },
+function Art({ height = 160, quadrant }: { height?: number; quadrant?: number }) {
+  if (quadrant === undefined) return <Image source={artwork} style={[s.art, { height }]} />;
+  return <View style={[s.artCrop, { height }]}><Image source={artwork} style={[s.artSheet, quadrant === 1 && s.q1, quadrant === 2 && s.q2, quadrant === 3 && s.q3]} /></View>;
+}
 
-  /* Testimonial */
-  testimonialSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 24,
-    maxWidth: 500,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  testimonialCard: {
-    backgroundColor: PINK.tint,
-    borderRadius: 12,
-    padding: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: PINK.mid,
-  },
-  testimonialQuote: {
-    fontSize: 13,
-    fontStyle: 'italic',
-    color: PINK.dark,
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  testimonialAuthor: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: PINK.mid,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatarText: {
-    color: PINK.white,
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  authorName: {
-    fontWeight: '600',
-    color: PINK.dark,
-    fontSize: 13,
-  },
-  authorRole: {
-    fontSize: 11,
-    color: PINK.textMuted,
-  },
+function Field({ placeholder, secure, icon }: { placeholder: string; secure?: boolean; icon: keyof typeof Ionicons.glyphMap }) {
+  return <View style={s.field}><Ionicons name={icon} size={19} color={C.muted} /><TextInput placeholder={placeholder} placeholderTextColor="#A89DA0" secureTextEntry={secure} style={s.input} /></View>;
+}
 
-  /* CTA */
-  ctaSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 24,
-    maxWidth: 500,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  primaryBtn: {
-    backgroundColor: PINK.mid,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    shadowColor: PINK.mid,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  primaryBtnText: {
-    color: PINK.white,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  secondaryBtn: {
-    backgroundColor: PINK.white,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: PINK.mid,
-  },
-  secondaryBtnText: {
-    color: PINK.mid,
-    fontSize: 15,
-    fontWeight: '600',
-  },
+function TabBar({ screen, go }: { screen: Screen; go: (x: Screen) => void }) {
+  const tabs: { key: Screen; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+    { key: 'home', label: 'Home', icon: 'home-outline' }, { key: 'scan', label: 'Scan', icon: 'scan-outline' },
+    { key: 'bookings', label: 'Bookings', icon: 'calendar-outline' }, { key: 'profile', label: 'Profile', icon: 'person-outline' },
+  ];
+  return <View style={s.tabBar}>{tabs.map(t => {
+    const active = screen === t.key || (t.key === 'scan' && ['processing', 'result', 'recommendations', 'style-detail'].includes(screen));
+    return <Pressable key={t.key} onPress={() => go(t.key)} style={s.tabItem}><Ionicons name={active ? (t.icon.replace('-outline', '') as keyof typeof Ionicons.glyphMap) : t.icon} size={22} color={active ? C.rose : C.muted} /><Text style={[s.tabLabel, active && s.tabActive]}>{t.label}</Text></Pressable>;
+  })}</View>;
+}
 
-  /* Footer */
-  footer: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: PINK.border,
-    maxWidth: 500,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  footerText: {
-    fontSize: 11,
-    color: PINK.textMuted,
-  },
+function ScreenFrame({ children, scroll = true }: { children: React.ReactNode; scroll?: boolean }) {
+  return <View style={s.webShell}><SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>{scroll ? <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>{children}</ScrollView> : children}</SafeAreaView></View>;
+}
+
+export default function FaceFitPrototype() {
+  const [screen, setScreen] = useState<Screen>('splash');
+  const [faceAnalysisConsent, setFaceAnalysisConsent] = useState(false);
+  const [locationConsent, setLocationConsent] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [mapVisible, setMapVisible] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<MapCoordinate | null>(null);
+  const [uploaded, setUploaded] = useState<string | null>(null);
+  const back = (fallback: Screen = 'home') => setScreen(fallback);
+  const mainScreens = ['home', 'scan', 'processing', 'result', 'recommendations', 'style-detail', 'bookings', 'profile'] as Screen[];
+
+  useEffect(() => { if (screen === 'splash') { const t = setTimeout(() => setScreen('onboarding'), 1400); return () => clearTimeout(t); } }, [screen]);
+  useEffect(() => { if (screen === 'processing') { const t = setTimeout(() => setScreen('result'), 2200); return () => clearTimeout(t); } }, [screen]);
+
+  const processScan = (uri: string) => {
+    setUploaded(uri);
+    setScreen('processing');
+  };
+  const openCurrentLocationMap = async () => {
+    if (isGettingLocation) return;
+    setIsGettingLocation(true);
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert('Location is turned off', 'Turn on location services, then try View map again.');
+        return;
+      }
+
+      const permissionResult = await Location.requestForegroundPermissionsAsync();
+      if (permissionResult.status !== Location.PermissionStatus.GRANTED) {
+        Alert.alert('Location permission needed', 'Allow location while using FaceFit to open a map at your current position.');
+        return;
+      }
+
+      const { coords } = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      setCurrentLocation({ latitude: coords.latitude, longitude: coords.longitude });
+      setMapVisible(true);
+    } catch {
+      Alert.alert('Unable to open the map', 'We could not get your current location. Please try again.');
+    } finally {
+      setIsGettingLocation(false);
+    }
+  };
+
+  const auth = (signup = false) => <ScreenFrame><Header title={signup ? 'Create account' : 'Welcome back'} onBack={() => setScreen('onboarding')} />
+    <View style={s.authIntro}><Text style={s.eyebrow}>YOUR BEST LOOK STARTS HERE</Text><Text style={s.title}>{signup ? 'Join FACE-FIT' : 'Good to see you'}</Text><Text style={s.body}>Personalized hair, trusted salons, one easy booking.</Text></View>
+    {signup && <Field icon="person-outline" placeholder="Full name" />}<Field icon="mail-outline" placeholder="Email address" />{signup && <Field icon="call-outline" placeholder="Phone number" />}<Field icon="lock-closed-outline" placeholder="Password" secure />
+    {!signup && <Text style={[s.link, { textAlign: 'right', marginBottom: 22 }]}>Forgot password?</Text>}
+    <Button label={signup ? 'Create account' : 'Log in'} onPress={() => setScreen('consent')} />
+    <Pressable onPress={() => setScreen(signup ? 'login' : 'signup')}><Text style={s.authSwitch}>{signup ? 'Already have an account? Log in' : 'New here? Create an account'}</Text></Pressable>
+  </ScreenFrame>;
+
+  const home = <ScreenFrame><View style={s.topRow}><View><Text style={s.greeting}>Good morning, Mia</Text><Text style={s.body}>Ready for a fresh look?</Text></View><Pressable onPress={() => setScreen('notifications')} style={s.avatar}><Ionicons name="notifications-outline" size={21} color={C.roseDark} /></Pressable></View>
+    <View style={s.hero}><View style={{ flex: 1 }}><Text style={s.heroKicker}>AI FACE ANALYSIS</Text><Text style={s.heroTitle}>Find the cut that fits you.</Text><Pressable onPress={() => setScreen('scan')} style={s.heroButton}><Text style={s.heroButtonText}>Scan your face</Text><Ionicons name="arrow-forward" size={18} color={C.roseDark} /></Pressable></View><View style={s.faceMini}><Ionicons name="scan" size={53} color={C.rose} /></View></View>
+    <SectionTitle title="Your latest matches" action="See all" /><Pressable onPress={() => setScreen('recommendations')}><Art height={175} /><View style={s.overlayPill}><Text style={s.overlayText}>4 styles matched • Oval</Text></View></Pressable>
+    <SectionTitle title="Salons near you" action="View map" onAction={openCurrentLocationMap} actionLoading={isGettingLocation} /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hRow}>{['Luna & Co.', 'Rose Room', 'Studio Muse'].map((x, i) => <Pressable key={x} onPress={() => setScreen('salon-detail')} style={s.salonCard}><View style={[s.salonThumb, { backgroundColor: i === 1 ? '#ECD7D2' : '#F2E7DF' }]}><Ionicons name="cut-outline" size={28} color={C.rose} /></View><Text style={s.cardTitle}>{x}</Text><Text style={s.small}>★ {4.9 - i * .1}  •  {i + 1}.2 km</Text></Pressable>)}</ScrollView>
+    <View style={s.tip}><Ionicons name="sparkles" size={22} color={C.gold} /><View style={{ flex: 1 }}><Text style={s.cardTitle}>Stylist tip</Text><Text style={s.small}>Soft layers are trending—and perfect for oval faces.</Text></View></View>
+  </ScreenFrame>;
+
+  const scan = <FaceScanScreen onBack={() => back()} onCaptured={processScan} />;
+
+  const processing = <ScreenFrame scroll={false}><View style={s.centerPage}><View style={s.processIcon}><Ionicons name="scan" size={50} color={C.rose} /><ActivityIndicator color={C.rose} size="large" style={StyleSheet.absoluteFill} /></View><Text style={s.title}>Analyzing your face shape…</Text><Text style={[s.body, s.centerText]}>Mapping landmarks, measuring proportions, and ranking hairstyles for you.</Text><View style={s.steps}>{['Preprocessing image', 'Detecting face landmarks', 'Classifying face shape', 'Matching hairstyles'].map((x, i) => <View style={s.step} key={x}><View style={[s.stepDot, i < 2 && s.stepDone]}>{i < 2 && <Ionicons name="checkmark" size={13} color={C.white} />}</View><Text style={s.small}>{x}</Text></View>)}</View></View></ScreenFrame>;
+
+  const result = <ScreenFrame><Header title="Your result" onBack={() => setScreen('home')} action="share-outline" /><Text style={s.eyebrow}>FACE SHAPE DETECTED</Text><Text style={s.display}>Oval</Text><View style={s.resultVisual}>{uploaded ? <Image source={{ uri: uploaded }} style={s.resultImage} /> : <Art height={230} quadrant={0} />}<View style={s.outlineOval} /><View style={s.confidence}><Text style={s.confidenceText}>94% confidence</Text></View></View><Text style={s.sectionTitle}>Balanced & versatile</Text><Text style={s.body}>Your face is slightly longer than it is wide, with a gently rounded jaw. Most cuts suit you—especially styles that preserve your natural balance.</Text><View style={s.chipRow}>{['Soft layers', 'Curtain bangs', 'Textured bob'].map(x => <View style={s.chip} key={x}><Text style={s.chipText}>{x}</Text></View>)}</View><Button label="See my hairstyle matches" onPress={() => setScreen('recommendations')} icon="sparkles" /><Button label="Scan again" onPress={() => setScreen('scan')} secondary /></ScreenFrame>;
+
+  const recommendations = <ScreenFrame><Header title="Top matches" onBack={() => setScreen('result')} action="heart-outline" /><Text style={s.body}>Ranked for your oval face, texture, and style goals.</Text><View style={s.chatBox}><Ionicons name="sparkles" size={19} color={C.rose} /><TextInput style={s.chatInput} placeholder="Refine: shorter, curly, low-maintenance…" placeholderTextColor="#9A8D91" /><Ionicons name="arrow-up-circle" size={27} color={C.rose} /></View>{stylesList.map((item, i) => <Pressable onPress={() => setScreen('style-detail')} style={s.recCard} key={item.name}><Art height={142} quadrant={i} /><View style={s.matchBadge}><Text style={s.matchText}>{item.match} match</Text></View><View style={s.recBody}><View style={s.sectionHead}><Text style={s.cardTitle}>{item.name}</Text><Ionicons name="heart-outline" size={20} color={C.rose} /></View><Text style={s.small}>{item.reason}</Text></View></Pressable>)}</ScreenFrame>;
+
+  const styleDetail = <ScreenFrame><Header title="Style details" onBack={() => setScreen('recommendations')} action="heart-outline" /><Art height={330} quadrant={0} /><View style={s.detailTitle}><View><Text style={s.title}>Soft Layered Lob</Text><Text style={s.matchText}>96% match for you</Text></View><View style={s.scoreCircle}><Text style={s.scoreText}>96</Text></View></View><Text style={s.sectionTitle}>Why it suits you</Text><Text style={s.body}>{"The collarbone length preserves your face's balanced proportions. Soft layers add movement around the cheeks without making the face appear longer."}</Text><View style={s.chipRow}>{['Medium length', 'Low upkeep', 'Works wavy'].map(x => <View style={s.chip} key={x}><Text style={s.chipText}>{x}</Text></View>)}</View><Button label="Find a salon for this style" onPress={() => setScreen('salons')} icon="location" /></ScreenFrame>;
+
+  const salons = <ScreenFrame><Header title="Nearby salons" onBack={() => setScreen('style-detail')} action="options-outline" /><View style={s.segment}><View style={s.segmentActive}><Ionicons name="list" size={17} color={C.rose} /><Text style={s.segmentText}>List</Text></View><View style={s.segmentItem}><Ionicons name="map-outline" size={17} color={C.muted} /><Text style={s.small}>Map</Text></View></View><View style={s.mapMock}><Ionicons name="map" size={48} color="#D8B7BF" /><View style={s.pin}><Ionicons name="location" size={22} color={C.white} /></View><Text style={s.small}>Makati • within 5 km</Text></View>{['Luna & Co. Salon', 'The Rose Room', 'Studio Muse'].map((x, i) => <Pressable key={x} onPress={() => setScreen('salon-detail')} style={s.listCard}><View style={s.salonSquare}><Ionicons name="cut" size={28} color={C.rose} /></View><View style={{ flex: 1 }}><Text style={s.cardTitle}>{x}</Text><Text style={s.small}>★ {4.9 - i * .1} ({128 - i * 21})  •  {1.2 + i}.0 km</Text><Text style={s.small}>Cuts • Color • Styling</Text></View><Ionicons name="chevron-forward" size={20} color={C.muted} /></Pressable>)}</ScreenFrame>;
+
+  const salonDetail = <ScreenFrame><Header title="Salon profile" onBack={() => setScreen('salons')} action="heart-outline" /><View style={s.salonHero}><Art height={210} /><View style={s.salonHeroShade}><Text style={s.salonHeroTitle}>Luna & Co. Salon</Text><Text style={s.lightSmall}>★ 4.9 (128)  •  1.2 km away</Text></View></View><View style={s.chipRow}>{['Women-led', 'AI style partner', 'Open until 8 PM'].map(x => <View style={s.chip} key={x}><Text style={s.chipText}>{x}</Text></View>)}</View><SectionTitle title="Services" action="See all" />{[['Signature cut', '₱850 • 60 min'], ['Cut + blow dry', '₱1,150 • 75 min'], ['Curly hair shaping', '₱1,300 • 90 min']].map(x => <View style={s.serviceRow} key={x[0]}><View><Text style={s.cardTitle}>{x[0]}</Text><Text style={s.small}>{x[1]}</Text></View><Ionicons name="add-circle" size={27} color={C.rose} /></View>)}<SectionTitle title="Meet the stylists" /><ScrollView horizontal contentContainerStyle={s.hRow} showsHorizontalScrollIndicator={false}>{['Aya', 'Nica', 'Bea'].map((x, i) => <View style={s.stylistMini} key={x}><View style={s.stylistAvatar}><Ionicons name="person" size={28} color={C.rose} /></View><Text style={s.cardTitle}>{x}</Text><Text style={s.small}>{i === 0 ? 'Layering' : 'Color expert'}</Text></View>)}</ScrollView><SectionTitle title="Reviews" action="4.9 overall" /><Text style={s.quote}>“Aya understood the recommendation and made it feel completely me.”</Text><Button label="Book appointment" onPress={() => setScreen('service')} /></ScreenFrame>;
+
+  const selection = (kind: 'service' | 'stylist') => <ScreenFrame><Header title={kind === 'service' ? 'Choose a service' : 'Choose your stylist'} onBack={() => setScreen(kind === 'service' ? 'salon-detail' : 'service')} /><View style={s.progress}><View style={s.progressFill} /></View><Text style={s.body}>Step {kind === 'service' ? '1' : '2'} of 3</Text>{(kind === 'service' ? [['Signature haircut', '₱850 • 60 min', 'cut'], ['Cut + deep treatment', '₱1,400 • 90 min', 'water'], ['Curly shaping', '₱1,300 • 90 min', 'sparkles']] : [['Aya Santos', 'Layering • Oval faces', 'person'], ['Nica Reyes', 'Color • Lived-in cuts', 'person'], ['No preference', 'First available stylist', 'people']]).map((x, i) => <Pressable key={x[0]} style={[s.choiceCard, i === 0 && s.choiceSelected]}><View style={s.choiceIcon}><Ionicons name={x[2] as keyof typeof Ionicons.glyphMap} size={24} color={C.rose} /></View><View style={{ flex: 1 }}><Text style={s.cardTitle}>{x[0]}</Text><Text style={s.small}>{x[1]}</Text></View><Ionicons name={i === 0 ? 'radio-button-on' : 'radio-button-off'} size={22} color={i === 0 ? C.rose : C.muted} /></Pressable>)}<View style={s.bottomSpace} /><Button label="Continue" onPress={() => setScreen(kind === 'service' ? 'stylist' : 'datetime')} /></ScreenFrame>;
+
+  const datetime = <ScreenFrame><Header title="Date & time" onBack={() => setScreen('stylist')} /><View style={s.progress}><View style={[s.progressFill, { width: '100%' }]} /></View><Text style={s.body}>Step 3 of 3</Text><View style={s.monthRow}><Ionicons name="chevron-back" size={20} color={C.muted} /><Text style={s.sectionTitle}>July 2026</Text><Ionicons name="chevron-forward" size={20} color={C.muted} /></View><View style={s.calendar}>{['M','T','W','T','F','S','S','13','14','15','16','17','18','19','20','21','22','23','24','25','26'].map((x, i) => <View key={`${x}${i}`} style={[s.day, x === '16' && s.dayActive]}><Text style={[s.dayText, x === '16' && { color: C.white }]}>{x}</Text></View>)}</View><SectionTitle title="Available times" /><View style={s.timeGrid}>{['9:00 AM','10:30 AM','1:00 PM','2:30 PM','4:00 PM','5:30 PM'].map((x, i) => <View style={[s.time, i === 2 && s.timeActive]} key={x}><Text style={[s.chipText, i === 2 && { color: C.white }]}>{x}</Text></View>)}</View><Button label="Review booking" onPress={() => setScreen('summary')} /></ScreenFrame>;
+
+  const summary = <ScreenFrame><Header title="Review booking" onBack={() => setScreen('datetime')} /><View style={s.summaryCard}><View style={s.summaryLogo}><Ionicons name="cut" size={28} color={C.rose} /></View><Text style={s.title}>Luna & Co. Salon</Text><Text style={s.body}>Signature haircut with Aya Santos</Text><View style={s.divider} />{[['calendar','Thursday, July 16'],['time','1:00 PM • 60 min'],['location','Makati City • 1.2 km']].map(x => <View style={s.summaryRow} key={x[0]}><Ionicons name={x[0] as keyof typeof Ionicons.glyphMap} size={21} color={C.rose} /><Text style={s.cardTitle}>{x[1]}</Text></View>)}<View style={s.divider} /><View style={s.sectionHead}><Text style={s.cardTitle}>Total</Text><Text style={s.price}>₱850</Text></View></View><View style={s.notice}><Ionicons name="information-circle" size={21} color={C.rose} /><Text style={s.small}>Free cancellation up to 12 hours before your appointment.</Text></View><Button label="Confirm booking" onPress={() => setScreen('success')} /></ScreenFrame>;
+
+  const success = <ScreenFrame scroll={false}><View style={s.centerPage}><View style={s.successIcon}><Ionicons name="checkmark" size={52} color={C.white} /></View><Text style={s.display}>{"You're booked!"}</Text><Text style={[s.body, s.centerText]}>Your appointment with Aya at Luna & Co. is confirmed.</Text><View style={s.ticket}><Text style={s.eyebrow}>THU, JUL 16 • 1:00 PM</Text><Text style={s.title}>Signature haircut</Text><Text style={s.body}>Booking FF-0716-128</Text></View><Button label="View my bookings" onPress={() => setScreen('bookings')} /><Button label="Back to home" onPress={() => setScreen('home')} secondary /></View></ScreenFrame>;
+
+  const bookings = <ScreenFrame><Header title="My bookings" action="notifications-outline" /><View style={s.segment}><View style={s.segmentActive}><Text style={s.segmentText}>Upcoming</Text></View><View style={s.segmentItem}><Text style={s.small}>Past</Text></View></View><View style={s.bookingCard}><Text style={s.eyebrow}>THURSDAY • JUL 16 • 1:00 PM</Text><Text style={s.title}>Signature haircut</Text><Text style={s.body}>Luna & Co. Salon • Aya Santos</Text><View style={s.divider} /><View style={s.bookingActions}><Pressable><Text style={s.link}>Reschedule</Text></Pressable><Pressable><Text style={s.mutedLink}>Cancel</Text></Pressable></View></View><SectionTitle title="Past appointments" /><View style={s.empty}><Ionicons name="calendar-outline" size={40} color="#CDBEC2" /><Text style={s.cardTitle}>No past appointments yet</Text><Text style={s.small}>Your completed visits will appear here.</Text></View></ScreenFrame>;
+
+  const profile = <ScreenFrame><Header title="Profile" action="settings-outline" /><View style={s.profileHead}><View style={s.profileAvatar}><Text style={s.profileInitial}>M</Text></View><View><Text style={s.title}>Mia Torres</Text><Text style={s.body}>Oval face • Wavy hair</Text></View></View><View style={s.preferenceCard}><Text style={s.eyebrow}>MY HAIR PROFILE</Text><View style={s.preferenceRow}>{[['Type','Wavy'],['Length','Medium'],['Texture','Fine']].map(x => <View key={x[0]}><Text style={s.small}>{x[0]}</Text><Text style={s.cardTitle}>{x[1]}</Text></View>)}</View></View>{[
+    ['heart-outline','Saved hairstyles','saved'], ['notifications-outline','Notifications','notifications'], ['star-outline','My reviews','reviews'], ['shield-checkmark-outline','Privacy & settings','settings']
+  ].map(x => <Pressable key={x[1]} onPress={() => setScreen(x[2] as Screen)} style={s.menuRow}><View style={s.menuIcon}><Ionicons name={x[0] as keyof typeof Ionicons.glyphMap} size={21} color={C.rose} /></View><Text style={[s.cardTitle, { flex: 1 }]}>{x[1]}</Text><Ionicons name="chevron-forward" size={20} color={C.muted} /></Pressable>)}<SectionTitle title="Professional portals" /><View style={s.roleRow}><Pressable onPress={() => setScreen('stylist-dashboard')} style={s.roleCard}><Ionicons name="cut" size={26} color={C.rose} /><Text style={s.cardTitle}>Hairstylist</Text></Pressable><Pressable onPress={() => setScreen('owner-dashboard')} style={s.roleCard}><Ionicons name="business" size={26} color={C.rose} /><Text style={s.cardTitle}>Salon owner</Text></Pressable></View></ScreenFrame>;
+
+  const simplePage = (title: string, rows: string[]) => <ScreenFrame><Header title={title} onBack={() => setScreen('profile')} />{title === 'Saved hairstyles' && <Art height={190} />}{rows.map((x, i) => <View style={s.listCard} key={x}><View style={s.menuIcon}><Ionicons name={title === 'Notifications' ? 'notifications' : title === 'My reviews' ? 'star' : 'shield-checkmark'} size={20} color={C.rose} /></View><View style={{ flex: 1 }}><Text style={s.cardTitle}>{x}</Text><Text style={s.small}>{i === 0 ? 'Updated today' : 'Tap to view details'}</Text></View><Ionicons name="chevron-forward" size={18} color={C.muted} /></View>)}{title === 'My reviews' && <Button label="Leave a review" onPress={() => {}} icon="camera-outline" />}{title === 'Settings' && <Button label="Log out" onPress={() => setScreen('login')} secondary />}</ScreenFrame>;
+
+  const rolePage = (role: 'stylist' | 'owner', page: string) => {
+    const owner = role === 'owner';
+    const nav: { label: string; icon: keyof typeof Ionicons.glyphMap; target: Screen }[] = owner ? [
+      { label: 'Manage booking requests', icon: 'calendar', target: 'owner-bookings' }, { label: 'Services & pricing', icon: 'pricetag', target: 'owner-services' }, { label: 'Staff & specializations', icon: 'people', target: 'owner-staff' }, { label: 'Business profile & portfolio', icon: 'business', target: 'owner-profile' }, { label: 'Reviews & ratings', icon: 'star', target: 'owner-reviews' }
+    ] : [
+      { label: 'Upcoming appointments', icon: 'calendar', target: 'stylist-appointments' }, { label: 'Client appointment detail', icon: 'person', target: 'stylist-detail' }, { label: 'Availability & service status', icon: 'toggle', target: 'stylist-status' }, { label: 'Notifications', icon: 'notifications', target: 'stylist-notifications' }
+    ];
+    return <ScreenFrame><Header title={page} onBack={() => page.includes('Dashboard') ? setScreen('profile') : setScreen(owner ? 'owner-dashboard' : 'stylist-dashboard')} />{page.includes('Dashboard') && <><Text style={s.greeting}>{owner ? 'Luna & Co.' : 'Hi, Aya'}</Text><Text style={s.body}>{owner ? 'Here’s how your salon is doing today.' : 'You have 4 clients on your schedule.'}</Text><View style={s.stats}>{[[owner ? '8' : '4','Today'],[owner ? '₱12.4k' : '2','Confirmed'],['4.9','Rating']].map(x => <View style={s.stat} key={x[1]}><Text style={s.statValue}>{x[0]}</Text><Text style={s.small}>{x[1]}</Text></View>)}</View></>}{page.includes('Dashboard') ? nav.map(x => <Pressable onPress={() => setScreen(x.target)} style={s.menuRow} key={x.label}><View style={s.menuIcon}><Ionicons name={x.icon} size={21} color={C.rose} /></View><Text style={[s.cardTitle,{flex:1}]}>{x.label}</Text><Ionicons name="chevron-forward" size={20} color={C.muted} /></Pressable>) : <><View style={s.bookingCard}><Text style={s.eyebrow}>{owner ? 'SALON MANAGEMENT' : 'UPCOMING • 1:00 PM'}</Text><Text style={s.title}>{owner ? page : 'Mia Torres'}</Text><Text style={s.body}>{owner ? 'Review and update your salon information.' : 'Oval face • Wavy, medium hair • Soft Layered Lob'}</Text><Art height={150} quadrant={0} /><View style={s.chipRow}><View style={s.chip}><Text style={s.chipText}>{owner ? 'Active' : 'AI recommendation attached'}</Text></View></View></View>{owner && page === 'Booking requests' && <View style={s.roleRow}><Button label="Approve" onPress={() => {}} /><Button label="Decline" onPress={() => {}} secondary /></View>}<Button label={page.includes('Services') ? 'Add service' : page.includes('Staff') ? 'Add hairstylist' : 'Update status'} onPress={() => {}} /></>}</ScreenFrame>;
+  };
+
+  let content: React.ReactNode;
+  if (screen === 'splash') content = <ScreenFrame scroll={false}><View style={s.splash}><View style={s.logo}><Text style={s.logoMarkBig}>F</Text></View><Text style={s.brand}>FACE-FIT</Text><Text style={s.splashTag}></Text><ActivityIndicator color={C.rose} style={{ marginTop: 38 }} /></View></ScreenFrame>;
+  else if (screen === 'onboarding') content = <ScreenFrame scroll={false}><OnboardingScreen onGetStarted={() => setScreen('signup')} onLogin={() => setScreen('login')} /></ScreenFrame>;
+  else if (screen === 'login') content = auth(false); else if (screen === 'signup') content = auth(true);
+  else if (screen === 'consent') content = <ScreenFrame><Header title="Before your scan" onBack={() => setScreen('signup')} /><View style={s.consentHero}><Ionicons name="shield-checkmark" size={52} color={C.rose} /></View><Text style={s.title}>Your face data stays yours</Text><Text style={s.body}>We use your photo only to analyze facial proportions and recommend hairstyles. You control whether it is saved or deleted.</Text>{[['camera','Camera access','Needed to capture your guided face scan.'],['location','Location access','Used while the app is open to show nearby salons.'],['lock-closed','Private by design','Images and location are handled securely and never used for ads.'],['trash','Your control','Delete your scan and results from Settings anytime.']].map(x => <View style={s.consentRow} key={x[0]}><View style={s.menuIcon}><Ionicons name={x[0] as keyof typeof Ionicons.glyphMap} size={21} color={C.rose} /></View><View style={{flex:1}}><Text style={s.cardTitle}>{x[1]}</Text><Text style={s.small}>{x[2]}</Text></View></View>)}<Pressable accessibilityRole="checkbox" accessibilityState={{ checked: faceAnalysisConsent }} onPress={() => setFaceAnalysisConsent(value => !value)} style={({ pressed }) => [s.checkRow, pressed && s.pressed]}><Ionicons name={faceAnalysisConsent ? 'checkbox' : 'square-outline'} size={24} color={faceAnalysisConsent ? C.rose : C.muted} /><Text style={[s.small,{flex:1}]}>I understand and consent to face-shape analysis as described in the Privacy Notice.</Text></Pressable><Pressable accessibilityRole="checkbox" accessibilityState={{ checked: locationConsent }} onPress={() => setLocationConsent(value => !value)} style={({ pressed }) => [s.checkRow, s.locationCheckRow, pressed && s.pressed]}><Ionicons name={locationConsent ? 'checkbox' : 'square-outline'} size={24} color={locationConsent ? C.rose : C.muted} /><Text style={[s.small,{flex:1}]}>I consent to location access while using the app so FaceFit can show salons near me.</Text></Pressable><Button label="Agree & continue" disabled={!faceAnalysisConsent || !locationConsent} onPress={() => setScreen('home')} /><Text style={[s.link,s.centerText]}>Read the full Privacy Notice</Text></ScreenFrame>;
+  else if (screen === 'home') content = home; else if (screen === 'scan') content = scan; else if (screen === 'processing') content = processing; else if (screen === 'result') content = result; else if (screen === 'recommendations') content = recommendations; else if (screen === 'style-detail') content = styleDetail; else if (screen === 'salons') content = salons; else if (screen === 'salon-detail') content = salonDetail; else if (screen === 'service') content = selection('service'); else if (screen === 'stylist') content = selection('stylist'); else if (screen === 'datetime') content = datetime; else if (screen === 'summary') content = summary; else if (screen === 'success') content = success; else if (screen === 'bookings') content = bookings; else if (screen === 'profile') content = profile;
+  else if (screen === 'saved') content = simplePage('Saved hairstyles', ['Soft Layered Lob', 'Textured Pixie', 'Curtain Layers']); else if (screen === 'notifications') content = simplePage('Notifications', ['Booking confirmed for July 16', 'Your new style matches are ready', 'Luna & Co. replied to your review']); else if (screen === 'reviews') content = simplePage('My reviews', ['Luna & Co. • 5 stars', 'Rose Room • 4 stars']); else if (screen === 'settings') content = simplePage('Settings', ['Edit profile', 'Privacy controls', 'Camera & location permissions', 'Delete face scan data']);
+  else if (screen === 'stylist-dashboard') content = rolePage('stylist', 'Stylist Dashboard'); else if (screen === 'stylist-appointments') content = rolePage('stylist', 'Appointments'); else if (screen === 'stylist-detail') content = rolePage('stylist', 'Appointment detail'); else if (screen === 'stylist-status') content = rolePage('stylist', 'Service & availability'); else if (screen === 'stylist-notifications') content = rolePage('stylist', 'Notifications');
+  else if (screen === 'owner-dashboard') content = rolePage('owner', 'Owner Dashboard'); else if (screen === 'owner-bookings') content = rolePage('owner', 'Booking requests'); else if (screen === 'owner-services') content = rolePage('owner', 'Services & pricing'); else if (screen === 'owner-staff') content = rolePage('owner', 'Staff management'); else if (screen === 'owner-profile') content = rolePage('owner', 'Business profile'); else content = rolePage('owner', 'Reviews & ratings');
+
+  return <KeyboardAvoidingView style={s.app} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><StatusBar style={screen === 'scan' ? 'light' : 'dark'} />{content}{mainScreens.includes(screen) && !['scan','processing','result','recommendations','style-detail'].includes(screen) && <View style={s.tabShell}><TabBar screen={screen} go={setScreen} /></View>}<Modal visible={mapVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMapVisible(false)}><SafeAreaView style={s.mapModal}><View style={s.mapHeader}><View><Text style={s.mapTitle}>Your location</Text><Text style={s.small}>Explore salons around your current position</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Close map" onPress={() => setMapVisible(false)} style={s.mapClose}><Ionicons name="close" size={24} color={C.ink} /></Pressable></View>{currentLocation && <LocationMap coordinate={currentLocation} />}</SafeAreaView></Modal></KeyboardAvoidingView>;
+}
+
+const s = StyleSheet.create({
+  app:{flex:1,backgroundColor:'#EFE8E8'},webShell:{flex:1,width:'100%',maxWidth:430,alignSelf:'center',backgroundColor:C.pale,overflow:'hidden'},safe:{flex:1},scroll:{padding:20,paddingBottom:120},pressed:{opacity:.82,transform:[{scale:.985}]},
+  header:{height:56,flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:18},headerTitle:{fontSize:17,fontWeight:'700',color:C.ink},iconButton:{width:40,height:40,borderRadius:20,backgroundColor:C.white,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:C.line},logoSmall:{width:36,height:36,borderRadius:12,backgroundColor:C.rose,alignItems:'center',justifyContent:'center'},logoMark:{fontSize:21,fontWeight:'900',fontStyle:'italic',color:C.white},
+  title:{fontSize:25,lineHeight:31,fontWeight:'800',color:C.ink},display:{fontSize:38,lineHeight:46,fontWeight:'800',color:C.ink,marginBottom:10},body:{fontSize:15,lineHeight:23,color:C.muted,marginBottom:20},small:{fontSize:13,lineHeight:19,color:C.muted},lightSmall:{fontSize:12,color:C.white,marginTop:4},eyebrow:{fontSize:11,fontWeight:'800',letterSpacing:1.2,color:C.rose,marginBottom:8},link:{color:C.rose,fontSize:14,fontWeight:'700'},mutedLink:{color:C.muted,fontSize:14,fontWeight:'700'},centerText:{textAlign:'center'},
+  button:{minHeight:54,borderRadius:18,backgroundColor:C.rose,flexDirection:'row',gap:9,alignItems:'center',justifyContent:'center',paddingHorizontal:18,marginTop:12},buttonSecondary:{backgroundColor:C.white,borderWidth:1,borderColor:'#DDBFC7'},buttonDisabled:{opacity:.45},buttonText:{fontSize:16,fontWeight:'800',color:C.white},buttonTextSecondary:{color:C.rose},
+  splash:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:C.pale},logo:{width:104,height:104,borderRadius:34,backgroundColor:C.rose,alignItems:'center',justifyContent:'center',shadowColor:C.rose,shadowOpacity:.25,shadowRadius:24,elevation:8},logoMarkBig:{fontSize:62,fontWeight:'900',fontStyle:'italic',color:C.white},brand:{fontSize:28,fontWeight:'900',letterSpacing:2.2,color:C.roseDark,marginTop:22},splashTag:{fontSize:14,color:C.muted,marginTop:6},
+  authSwitch:{textAlign:'center',color:C.roseDark,fontWeight:'700',fontSize:14,marginTop:22},
+  authIntro:{marginVertical:15},field:{height:56,borderRadius:17,backgroundColor:C.white,borderWidth:1,borderColor:C.line,flexDirection:'row',alignItems:'center',paddingHorizontal:16,gap:10,marginBottom:13},input:{flex:1,fontSize:15,color:C.ink,outlineStyle:'none' as never},
+  consentHero:{height:150,borderRadius:28,backgroundColor:C.blush,alignItems:'center',justifyContent:'center',marginBottom:24},consentRow:{flexDirection:'row',gap:13,marginTop:18},checkRow:{padding:15,borderRadius:16,backgroundColor:C.white,flexDirection:'row',alignItems:'flex-start',gap:11,marginTop:25},locationCheckRow:{marginTop:10},menuIcon:{width:42,height:42,borderRadius:14,backgroundColor:C.blush,alignItems:'center',justifyContent:'center'},
+  topRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:22},greeting:{fontSize:25,fontWeight:'800',color:C.ink,marginBottom:3},avatar:{width:46,height:46,borderRadius:23,backgroundColor:C.blush,alignItems:'center',justifyContent:'center'},hero:{minHeight:210,borderRadius:24,backgroundColor:C.roseDark,padding:22,flexDirection:'row',alignItems:'center',overflow:'hidden',marginBottom:28},heroKicker:{fontSize:10,fontWeight:'800',letterSpacing:1.1,color:'#F2C7D2',marginBottom:8},heroTitle:{fontSize:27,lineHeight:33,fontWeight:'800',color:C.white,maxWidth:210},heroButton:{marginTop:20,alignSelf:'flex-start',height:42,borderRadius:14,backgroundColor:C.white,paddingHorizontal:14,flexDirection:'row',alignItems:'center',gap:8},heroButtonText:{fontSize:13,fontWeight:'800',color:C.roseDark},faceMini:{position:'absolute',right:-20,bottom:-20,width:130,height:170,borderWidth:2,borderColor:'#D88A9E',borderRadius:70,alignItems:'center',justifyContent:'center'},
+  sectionHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:4},sectionTitle:{fontSize:19,fontWeight:'800',color:C.ink,marginVertical:15},sectionAction:{minWidth:84,minHeight:40,flexDirection:'row',alignItems:'center',justifyContent:'flex-end',gap:6},art:{width:'100%',borderRadius:20,resizeMode:'cover'},artCrop:{width:'100%',borderRadius:18,overflow:'hidden',backgroundColor:C.blush},artSheet:{width:'200%',height:'200%',resizeMode:'cover'},q1:{transform:[{translateX:'-50%'}]},q2:{transform:[{translateY:'-50%'}]},q3:{transform:[{translateX:'-50%'},{translateY:'-50%'}]},overlayPill:{position:'absolute',bottom:12,left:12,backgroundColor:'rgba(41,35,38,.85)',paddingVertical:8,paddingHorizontal:12,borderRadius:12},overlayText:{color:C.white,fontSize:12,fontWeight:'700'},hRow:{gap:12,paddingRight:10},salonCard:{width:150,padding:10,borderRadius:18,backgroundColor:C.white,borderWidth:1,borderColor:C.line},salonThumb:{height:85,borderRadius:14,alignItems:'center',justifyContent:'center',marginBottom:9},cardTitle:{fontSize:15,fontWeight:'700',color:C.ink,marginBottom:3},tip:{marginTop:25,padding:16,borderRadius:18,backgroundColor:'#FFF3DA',flexDirection:'row',gap:12},
+  tabShell:{position:'absolute',bottom:0,left:0,right:0,alignItems:'center'},tabBar:{width:'100%',maxWidth:430,height:82,paddingBottom:15,backgroundColor:C.white,borderTopWidth:1,borderTopColor:C.line,flexDirection:'row',shadowColor:'#000',shadowOpacity:.08,shadowRadius:16,elevation:12},tabItem:{flex:1,alignItems:'center',justifyContent:'center',gap:3},tabLabel:{fontSize:11,fontWeight:'600',color:C.muted},tabActive:{color:C.rose,fontWeight:'800'},
+  centerPage:{flex:1,padding:24,alignItems:'center',justifyContent:'center'},processIcon:{width:105,height:105,borderRadius:53,backgroundColor:C.blush,alignItems:'center',justifyContent:'center',marginBottom:28},steps:{width:'100%',padding:20,borderRadius:20,backgroundColor:C.white,marginTop:20},step:{flexDirection:'row',gap:12,alignItems:'center',marginVertical:8},stepDot:{width:21,height:21,borderRadius:11,borderWidth:2,borderColor:'#D8C9CD',alignItems:'center',justifyContent:'center'},stepDone:{backgroundColor:C.green,borderColor:C.green},
+  resultVisual:{height:285,borderRadius:24,overflow:'hidden',marginBottom:12,position:'relative'},resultImage:{width:'100%',height:'100%',resizeMode:'cover'},outlineOval:{position:'absolute',width:150,height:210,borderRadius:75,borderWidth:2,borderColor:C.white,alignSelf:'center',top:34},confidence:{position:'absolute',right:12,bottom:12,backgroundColor:C.white,borderRadius:12,padding:9},confidenceText:{fontSize:12,fontWeight:'800',color:C.green},chipRow:{flexDirection:'row',flexWrap:'wrap',gap:8,marginBottom:18},chip:{backgroundColor:C.blush,borderRadius:99,paddingHorizontal:12,paddingVertical:8},chipText:{fontSize:12,fontWeight:'700',color:C.roseDark},
+  chatBox:{height:54,borderRadius:18,backgroundColor:C.white,borderWidth:1,borderColor:'#E2C8CF',flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:13,marginBottom:20},chatInput:{flex:1,fontSize:13,color:C.ink,outlineStyle:'none' as never},recCard:{backgroundColor:C.white,borderRadius:20,overflow:'hidden',marginBottom:18,borderWidth:1,borderColor:C.line},recBody:{padding:14},matchBadge:{position:'absolute',top:12,right:12,backgroundColor:C.white,borderRadius:10,padding:8},matchText:{fontSize:12,fontWeight:'800',color:C.rose},detailTitle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:20},scoreCircle:{width:54,height:54,borderRadius:27,backgroundColor:C.blush,alignItems:'center',justifyContent:'center'},scoreText:{fontSize:18,fontWeight:'900',color:C.rose},
+  segment:{height:48,borderRadius:15,backgroundColor:'#EEE6E7',padding:4,flexDirection:'row',marginBottom:17},segmentActive:{flex:1,borderRadius:12,backgroundColor:C.white,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:6},segmentItem:{flex:1,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:6},segmentText:{fontSize:13,fontWeight:'800',color:C.rose},mapMock:{height:150,borderRadius:22,backgroundColor:'#EFE6E0',alignItems:'center',justifyContent:'center',marginBottom:14,overflow:'hidden'},pin:{position:'absolute',top:25,right:80,width:38,height:38,borderRadius:19,backgroundColor:C.rose,alignItems:'center',justifyContent:'center'},listCard:{minHeight:82,borderRadius:18,backgroundColor:C.white,borderWidth:1,borderColor:C.line,padding:13,flexDirection:'row',alignItems:'center',gap:12,marginBottom:12},salonSquare:{width:58,height:58,borderRadius:16,backgroundColor:C.blush,alignItems:'center',justifyContent:'center'},
+  mapModal:{flex:1,backgroundColor:C.pale},mapHeader:{minHeight:82,paddingHorizontal:18,paddingVertical:12,backgroundColor:C.white,borderBottomWidth:1,borderBottomColor:C.line,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},mapTitle:{fontSize:19,fontWeight:'800',color:C.ink,marginBottom:2},mapClose:{width:42,height:42,borderRadius:21,alignItems:'center',justifyContent:'center',backgroundColor:C.pale,borderWidth:1,borderColor:C.line},
+  salonHero:{height:250,borderRadius:23,overflow:'hidden',marginBottom:14},salonHeroShade:{position:'absolute',left:0,right:0,bottom:0,padding:16,backgroundColor:'rgba(40,25,30,.62)'},salonHeroTitle:{fontSize:23,fontWeight:'800',color:C.white},serviceRow:{paddingVertical:14,borderBottomWidth:1,borderBottomColor:C.line,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},stylistMini:{width:112,padding:12,borderRadius:18,backgroundColor:C.white},stylistAvatar:{width:50,height:50,borderRadius:25,backgroundColor:C.blush,alignItems:'center',justifyContent:'center',marginBottom:8},quote:{fontSize:15,lineHeight:23,fontStyle:'italic',color:C.muted,backgroundColor:C.white,padding:17,borderRadius:17},
+  progress:{height:5,borderRadius:3,backgroundColor:'#E7D9DC',overflow:'hidden',marginBottom:12},progressFill:{width:'66%',height:'100%',backgroundColor:C.rose},choiceCard:{minHeight:78,padding:13,borderRadius:18,backgroundColor:C.white,borderWidth:1,borderColor:C.line,flexDirection:'row',alignItems:'center',gap:12,marginBottom:12},choiceSelected:{borderWidth:2,borderColor:C.rose,backgroundColor:'#FFF9FA'},choiceIcon:{width:48,height:48,borderRadius:16,backgroundColor:C.blush,alignItems:'center',justifyContent:'center'},bottomSpace:{height:60},monthRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},calendar:{flexDirection:'row',flexWrap:'wrap',marginBottom:20},day:{width:'14.28%',aspectRatio:1,alignItems:'center',justifyContent:'center',borderRadius:99},dayActive:{backgroundColor:C.rose},dayText:{fontSize:13,fontWeight:'700',color:C.ink},timeGrid:{flexDirection:'row',flexWrap:'wrap',gap:10,marginBottom:18},time:{width:'31%',paddingVertical:13,borderRadius:13,backgroundColor:C.white,alignItems:'center',borderWidth:1,borderColor:C.line},timeActive:{backgroundColor:C.rose,borderColor:C.rose},
+  summaryCard:{padding:20,borderRadius:22,backgroundColor:C.white,borderWidth:1,borderColor:C.line},summaryLogo:{width:58,height:58,borderRadius:18,backgroundColor:C.blush,alignItems:'center',justifyContent:'center',marginBottom:17},divider:{height:1,backgroundColor:C.line,marginVertical:17},summaryRow:{flexDirection:'row',gap:12,alignItems:'center',marginVertical:9},price:{fontSize:22,fontWeight:'900',color:C.rose},notice:{padding:14,borderRadius:16,backgroundColor:C.blush,flexDirection:'row',gap:10,marginTop:15},successIcon:{width:100,height:100,borderRadius:50,backgroundColor:C.green,alignItems:'center',justifyContent:'center',marginBottom:24},ticket:{width:'100%',padding:20,borderRadius:20,backgroundColor:C.white,alignItems:'center',marginVertical:15},
+  bookingCard:{padding:19,borderRadius:21,backgroundColor:C.white,borderWidth:1,borderColor:C.line,marginBottom:22},bookingActions:{flexDirection:'row',justifyContent:'space-around'},empty:{alignItems:'center',padding:35,borderRadius:20,borderStyle:'dashed',borderWidth:1,borderColor:'#D9CACE',gap:6},profileHead:{flexDirection:'row',alignItems:'center',gap:15,marginBottom:22},profileAvatar:{width:74,height:74,borderRadius:37,backgroundColor:C.rose,alignItems:'center',justifyContent:'center'},profileInitial:{fontSize:30,fontWeight:'900',color:C.white},preferenceCard:{padding:17,borderRadius:20,backgroundColor:C.blush,marginBottom:20},preferenceRow:{flexDirection:'row',justifyContent:'space-between'},menuRow:{minHeight:68,borderBottomWidth:1,borderBottomColor:C.line,flexDirection:'row',alignItems:'center',gap:13},roleRow:{flexDirection:'row',gap:12},roleCard:{flex:1,padding:17,borderRadius:18,backgroundColor:C.white,borderWidth:1,borderColor:C.line,gap:10},stats:{flexDirection:'row',gap:10,marginVertical:20},stat:{flex:1,padding:14,borderRadius:17,backgroundColor:C.white,alignItems:'center'},statValue:{fontSize:21,fontWeight:'900',color:C.roseDark},
 });

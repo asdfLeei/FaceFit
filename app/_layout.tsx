@@ -1,6 +1,7 @@
-import { Stack, useSegments, useRouter } from 'expo-router';
 import { AuthProvider, useAuth } from '@/context/auth-context';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 function RootLayoutNav() {
   const { isSignedIn } = useAuth();
@@ -8,40 +9,18 @@ function RootLayoutNav() {
   const router = useRouter();
 
   useEffect(() => {
-    const inAuthGroup = segments[0] === 'auth';
     const currentRoute = segments[0];
 
     if (isSignedIn && currentRoute !== 'dashboard') {
-      // Redirect to dashboard if signed in
       router.replace('/dashboard');
     } else if (!isSignedIn && currentRoute === 'dashboard') {
-      // Redirect to welcome if not signed in
       router.replace('/');
     }
-  }, [isSignedIn, segments]);
+  }, [isSignedIn, router, segments]);
 
-  return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="login" />
-      <Stack.Screen name="signup" />
-      <Stack.Screen name="dashboard" />
-      <Stack.Screen name="dashboard-customer" />
-      <Stack.Screen name="dashboard-hairstylist" />
-      <Stack.Screen name="dashboard-admin" />
-      <Stack.Screen name="(tabs)" />
-    </Stack>
-  );
+  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FFF8F6' } }} />;
 }
 
 export default function RootLayout() {
-  return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
-  );
+  return <SafeAreaProvider><AuthProvider><RootLayoutNav /></AuthProvider></SafeAreaProvider>;
 }
