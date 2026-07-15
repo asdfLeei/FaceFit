@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS salons (
   longitude DECIMAL(10, 7),
   phone VARCHAR(30),
   website VARCHAR(500),
+  profile_image_path VARCHAR(500),
   source VARCHAR(50),
   external_id VARCHAR(100),
   source_url VARCHAR(500),
@@ -54,6 +55,8 @@ CREATE TABLE IF NOT EXISTS stylists (
   salon_id BIGINT UNSIGNED NOT NULL,
   specialties VARCHAR(255),
   is_available BOOLEAN NOT NULL DEFAULT TRUE,
+  image_path VARCHAR(500),
+  deleted_at DATETIME NULL,
   CONSTRAINT fk_stylists_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_stylists_salon FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
 );
@@ -66,6 +69,7 @@ CREATE TABLE IF NOT EXISTS services (
   price DECIMAL(10, 2) NOT NULL,
   duration_minutes SMALLINT UNSIGNED NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  deleted_at DATETIME NULL,
   CONSTRAINT fk_services_salon FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
   INDEX idx_services_salon_active (salon_id, is_active)
 );
@@ -120,6 +124,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   user_id BIGINT UNSIGNED NOT NULL,
   title VARCHAR(150) NOT NULL,
   message VARCHAR(500) NOT NULL,
+  destination VARCHAR(50),
+  reference_id BIGINT UNSIGNED,
   is_read BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -132,6 +138,8 @@ CREATE TABLE IF NOT EXISTS reviews (
   rating TINYINT UNSIGNED NOT NULL,
   comment VARCHAR(500),
   image_path VARCHAR(500),
+  owner_reply VARCHAR(1000),
+  owner_replied_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_reviews_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_reviews_salon FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
@@ -140,8 +148,44 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS image_path VARCHAR(500) AFTER comment;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS owner_reply VARCHAR(1000) AFTER image_path;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS owner_replied_at DATETIME NULL AFTER owner_reply;
 ALTER TABLE reviews ADD INDEX IF NOT EXISTS idx_reviews_user_salon (user_id, salon_id);
 ALTER TABLE reviews DROP INDEX IF EXISTS uq_user_salon_review;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS destination VARCHAR(50) AFTER message;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_id BIGINT UNSIGNED AFTER destination;
+ALTER TABLE salons ADD COLUMN IF NOT EXISTS profile_image_path VARCHAR(500) AFTER website;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS deleted_at DATETIME NULL AFTER is_active;
+ALTER TABLE stylists ADD COLUMN IF NOT EXISTS image_path VARCHAR(500) AFTER is_available;
+ALTER TABLE stylists ADD COLUMN IF NOT EXISTS deleted_at DATETIME NULL AFTER is_available;
+
+CREATE TABLE IF NOT EXISTS salon_portfolio_images (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  salon_id BIGINT UNSIGNED NOT NULL,
+  image_path VARCHAR(500) NOT NULL,
+  caption VARCHAR(200),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_portfolio_image_salon FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
+  INDEX idx_portfolio_images_salon (salon_id, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS review_replies (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  review_id BIGINT UNSIGNED NOT NULL,
+  owner_id BIGINT UNSIGNED NOT NULL,
+  message VARCHAR(1000),
+  image_path VARCHAR(500),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_review_replies_review FOREIGN KEY (review_id) REFERENCES reviews(id) ON DELETE CASCADE,
+  CONSTRAINT fk_review_replies_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_review_replies_review (review_id, created_at)
+);
+
+INSERT INTO review_replies (review_id, owner_id, message, created_at)
+SELECT r.id, s.owner_id, r.owner_reply, COALESCE(r.owner_replied_at, r.created_at)
+FROM reviews r JOIN salons s ON s.id = r.salon_id
+WHERE r.owner_reply IS NOT NULL AND s.owner_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM review_replies rr WHERE rr.review_id = r.id AND rr.message = r.owner_reply);
 
 CREATE TABLE IF NOT EXISTS privacy_settings (
   user_id BIGINT UNSIGNED PRIMARY KEY,

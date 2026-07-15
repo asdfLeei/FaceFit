@@ -10,6 +10,7 @@ export type Salon = {
   longitude: number | null;
   phone: string | null;
   website: string | null;
+  profileImageUrl: string | null;
   source: string | null;
   source_url: string | null;
   rating: number;
@@ -31,6 +32,23 @@ export type SalonStaff = {
   name: string;
   specialties: string | null;
   isAvailable: boolean;
+  imageUrl: string | null;
+};
+
+export type ReviewReply = {
+  id: number;
+  reviewId: number;
+  message: string | null;
+  imageUrl: string | null;
+  salonName: string;
+  createdAt: string;
+};
+
+export type PortfolioImage = {
+  id: number;
+  imageUrl: string;
+  caption: string | null;
+  createdAt: string;
 };
 
 export type SalonReview = {
@@ -40,6 +58,9 @@ export type SalonReview = {
   createdAt: string;
   reviewerName: string;
   imageUrl: string | null;
+  ownerReply: string | null;
+  ownerRepliedAt: string | null;
+  replies: ReviewReply[];
 };
 
 export type SalonReviewSummary = { count: number; average: number };
@@ -49,6 +70,8 @@ export type MySalonReview = {
   comment: string | null;
   imageUrl: string | null;
   createdAt: string;
+  ownerReply: string | null;
+  ownerRepliedAt: string | null;
 };
 
 export type AuthUser = { id: number; fullName: string; email: string; phone: string | null; role: string };
@@ -73,13 +96,14 @@ export type Booking = {
   salonName: string;
   stylistName: string | null;
 };
-export type AccountItem = { id: number; title: string; detail?: string; isRead?: boolean; createdAt: string };
+export type AccountItem = { id: number; title: string; detail?: string; destination?: string | null; referenceId?: number | null; isRead?: boolean; createdAt: string };
 export type PrivacySettings = { notificationsEnabled: boolean; saveScanHistory: boolean };
 export type OwnerDashboard = {
   id: number;
   name: string;
   address: string;
   phone: string | null;
+  profileImageUrl: string | null;
   rating: number;
   reviewCount: number;
   serviceCount: number;
@@ -110,6 +134,7 @@ export type OwnerSalonProfile = {
   city: string;
   phone: string | null;
   website: string | null;
+  profileImageUrl: string | null;
   rating: number;
   openingTime: string | null;
   closingTime: string | null;
@@ -121,6 +146,37 @@ export type OwnerManagement = {
   staff: OwnerStaff[];
   bookings: OwnerBooking[];
   reviews: SalonReview[];
+  portfolioImages: PortfolioImage[];
+};
+
+export type OwnerServiceInput = {
+  name: string;
+  description: string;
+  price: number;
+  durationMinutes: number;
+  isActive?: boolean;
+};
+
+export type OwnerStaffInput = {
+  name: string;
+  email: string;
+  phone: string;
+  specialties: string;
+  password?: string;
+  isAvailable?: boolean;
+  imageData?: string | null;
+};
+
+export type OwnerProfileInput = {
+  name: string;
+  description: string;
+  address: string;
+  city: string;
+  phone: string;
+  website: string;
+  openingTime: string;
+  closingTime: string;
+  imageData?: string | null;
 };
 
 async function fetchApi(path: string, options?: RequestInit) {
@@ -205,11 +261,86 @@ export async function updateOwnerBooking(token: string, bookingId: number, statu
   return result.data as { id: number; status: string };
 }
 
+async function ownerRequest<T>(token: string, path: string, method: 'POST' | 'PUT' | 'DELETE', body?: object) {
+  const response = await fetchApi(path, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error || `API request failed (${response.status})`);
+  return result.data as T;
+}
+
+export function createOwnerService(token: string, input: OwnerServiceInput) {
+  return ownerRequest<OwnerService>(token, '/api/owner/services', 'POST', input);
+}
+
+export function updateOwnerService(token: string, serviceId: number, input: OwnerServiceInput) {
+  return ownerRequest<OwnerService>(token, `/api/owner/services/${serviceId}`, 'PUT', input);
+}
+
+export function removeOwnerService(token: string, serviceId: number) {
+  return ownerRequest<{ id: number; removed: boolean }>(token, `/api/owner/services/${serviceId}`, 'DELETE');
+}
+
+export function createOwnerStaff(token: string, input: OwnerStaffInput) {
+  return ownerRequest<OwnerStaff>(token, '/api/owner/staff', 'POST', input);
+}
+
+export function updateOwnerStaff(token: string, staffId: number, input: OwnerStaffInput) {
+  return ownerRequest<OwnerStaff>(token, `/api/owner/staff/${staffId}`, 'PUT', input);
+}
+
+export function removeOwnerStaff(token: string, staffId: number) {
+  return ownerRequest<{ id: number; removed: boolean }>(token, `/api/owner/staff/${staffId}`, 'DELETE');
+}
+
+export function createOwnerPortfolioImage(token: string, imageData: string, caption = '') {
+  return ownerRequest<PortfolioImage>(token, '/api/owner/portfolio-images', 'POST', { imageData, caption });
+}
+
+export function removeOwnerPortfolioImage(token: string, imageId: number) {
+  return ownerRequest<{ id: number; removed: boolean }>(token, `/api/owner/portfolio-images/${imageId}`, 'DELETE');
+}
+
+export function updateOwnerProfile(token: string, input: OwnerProfileInput) {
+  return ownerRequest<OwnerSalonProfile>(token, '/api/owner/profile', 'PUT', input);
+}
+
+export function createOwnerReviewReply(token: string, reviewId: number, message: string, imageData?: string | null) {
+  return ownerRequest<ReviewReply>(token, `/api/owner/reviews/${reviewId}/replies`, 'POST', { message, imageData });
+}
+
+export function removeOwnerReviewReply(token: string, replyId: number) {
+  return ownerRequest<{ id: number; removed: boolean }>(token, `/api/owner/review-replies/${replyId}`, 'DELETE');
+}
+
 export async function getAccountItems(token: string, section: 'saved' | 'salons' | 'notifications' | 'reviews') {
   const response = await fetchApi(`/api/account/${section}`, { headers: { Authorization: `Bearer ${token}` } });
   const result = await response.json().catch(() => null);
   if (!response.ok) throw new Error(result?.error || `API request failed (${response.status})`);
-  return (result as { data: AccountItem[] }).data;
+  const items = (result as { data: AccountItem[] }).data;
+  return section === 'notifications'
+    ? items.map(item => ({ ...item, isRead: Boolean(item.isRead) }))
+    : items;
+}
+
+export async function getUnreadNotificationCount(token: string) {
+  const response = await fetchApi('/api/notifications/unread-count', { headers: { Authorization: `Bearer ${token}` } });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error || `API request failed (${response.status})`);
+  return Number((result as { data: { unreadCount: number } }).data.unreadCount);
+}
+
+export async function markNotificationRead(token: string, notificationId: number) {
+  const response = await fetchApi(`/api/notifications/${notificationId}/read`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error || `API request failed (${response.status})`);
+  return (result as { data: { id: number; isRead: boolean } }).data;
 }
 
 export async function saveHairstyle(token: string, title: string) {
@@ -270,6 +401,11 @@ export async function getSalonServices(salonId: number) {
 
 export async function getSalonStaff(salonId: number) {
   const response = await apiRequest<{ data: SalonStaff[] }>(`/api/salons/${salonId}/staff`);
+  return response.data;
+}
+
+export async function getSalonPortfolio(salonId: number) {
+  const response = await apiRequest<{ data: PortfolioImage[] }>(`/api/salons/${salonId}/portfolio`);
   return response.data;
 }
 
