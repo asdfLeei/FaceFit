@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -67,7 +68,7 @@ export function FaceScanScreen({ onBack, onCaptured }: FaceScanScreenProps) {
   };
 
   return (
-    <View style={styles.shell}>
+    <View style={[styles.shell, Platform.OS === 'web' && styles.shellWeb]}>
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
         <View style={styles.header}>
           <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={onBack} style={styles.headerButton}>
@@ -160,6 +161,7 @@ const cornerBase = {
 
 const styles = StyleSheet.create({
   shell: { flex: 1, width: '100%', maxWidth: 430, alignSelf: 'center', backgroundColor: colors.dark },
+  shellWeb: { maxWidth: '100%', alignSelf: 'stretch' },
   safe: { flex: 1 },
   header: { height: 70, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.dark },
   headerButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2A2427' },

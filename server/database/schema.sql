@@ -131,12 +131,17 @@ CREATE TABLE IF NOT EXISTS reviews (
   salon_id BIGINT UNSIGNED NOT NULL,
   rating TINYINT UNSIGNED NOT NULL,
   comment VARCHAR(500),
+  image_path VARCHAR(500),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_reviews_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_reviews_salon FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
   CONSTRAINT chk_reviews_rating CHECK (rating BETWEEN 1 AND 5),
-  UNIQUE KEY uq_user_salon_review (user_id, salon_id)
+  INDEX idx_reviews_user_salon (user_id, salon_id)
 );
+
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS image_path VARCHAR(500) AFTER comment;
+ALTER TABLE reviews ADD INDEX IF NOT EXISTS idx_reviews_user_salon (user_id, salon_id);
+ALTER TABLE reviews DROP INDEX IF EXISTS uq_user_salon_review;
 
 CREATE TABLE IF NOT EXISTS privacy_settings (
   user_id BIGINT UNSIGNED PRIMARY KEY,

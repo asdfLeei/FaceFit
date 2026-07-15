@@ -10,7 +10,8 @@
     "db:init": "node scripts/init-db.js",
     "salons:import": "node scripts/import-nasugbu-salons.js",
     "salons:preview": "node scripts/import-nasugbu-salons.js --dry-run",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/db.js && node --check scripts/init-db.js && node --check scripts/import-nasugbu-salons.js"
+    "owner:create": "node scripts/create-salon-owner.js",
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/db.js && node --check scripts/init-db.js && node --check scripts/import-nasugbu-salons.js && node --check scripts/create-salon-owner.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
