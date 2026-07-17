@@ -20,6 +20,7 @@ const managedUploadDirectories = {
   salon: path.join(__dirname, '..', 'uploads', 'salon'),
   staff: path.join(__dirname, '..', 'uploads', 'staff'),
   replies: path.join(__dirname, '..', 'uploads', 'replies'),
+  profile: path.join(__dirname, '..', 'uploads', 'profile'),
 };
 Promise.all([reviewUploadsDirectory, ...Object.values(managedUploadDirectories)].map(directory => fs.mkdir(directory, { recursive: true })))
   .catch((error) => console.error('Could not create upload directories:', error));
@@ -149,22 +150,50 @@ app.post('/api/auth/signup', async (request, response, next) => {
   const phone = String(request.body.phone || '').trim() || null;
   const password = String(request.body.password || '');
   const role = request.body.role === 'owner' ? 'owner' : 'customer';
+  const salonName = String(request.body.salonName || '').trim();
+  const salonAddress = String(request.body.salonAddress || '').trim();
+  const salonCity = String(request.body.salonCity || '').trim();
+  const latitude = Number(request.body.latitude);
+  const longitude = Number(request.body.longitude);
+  const salonLogoData = request.body.salonLogoData;
 
   if (fullName.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8) {
     return response.status(400).json({ error: 'Enter a valid name, email, and password of at least 8 characters.' });
   }
+  if (role === 'owner' && (salonName.length < 2 || salonAddress.length < 5 || salonCity.length < 2 || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
+    return response.status(400).json({ error: 'Enter your salon name, address, city, and a valid map location.' });
+  }
 
+  const connection = await pool.getConnection();
+  let storedLogo = null;
   try {
+    await connection.beginTransaction();
     const passwordHash = await bcrypt.hash(password, 12);
-    const [result] = await pool.execute(
+    const [result] = await connection.execute(
       'INSERT INTO users (full_name, email, password_hash, phone, role) VALUES (?, ?, ?, ?, ?)',
       [fullName, email, passwordHash, phone, role],
     );
+    if (role === 'owner') {
+      const [salonResult] = await connection.execute(
+        `INSERT INTO salons (owner_id, name, address, city, latitude, longitude, phone, source, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'owner-registration', TRUE)`,
+        [result.insertId, salonName, salonAddress, salonCity, latitude, longitude, phone],
+      );
+      if (typeof salonLogoData === 'string') {
+        storedLogo = await storeManagedImage(salonLogoData, 'salon', result.insertId, salonResult.insertId);
+        await connection.execute('UPDATE salons SET profile_image_path = ? WHERE id = ?', [storedLogo, salonResult.insertId]);
+      }
+    }
+    await connection.commit();
     const user = { id: result.insertId, full_name: fullName, email, phone, role };
     return response.status(201).json({ data: { user: publicUser(user), token: createToken(user) } });
   } catch (error) {
+    await connection.rollback();
+    if (storedLogo) await removeManagedImage(storedLogo, 'salon').catch(() => {});
     if (error.code === 'ER_DUP_ENTRY') return response.status(409).json({ error: 'An account with this email already exists.' });
     return next(error);
+  } finally {
+    connection.release();
   }
 });
 
@@ -192,7 +221,7 @@ app.get('/api/profile', authenticate, async (request, response, next) => {
   try {
     const [rows] = await pool.execute(
       `SELECT u.id, u.full_name AS fullName, u.email, u.phone, u.role,
-              u.created_at AS createdAt,
+              u.created_at AS createdAt, u.profile_image_path AS profileImageUrl,
               cp.hair_type AS hairType, cp.hair_length AS hairLength,
               cp.hair_texture AS hairTexture,
               (SELECT fa.face_shape FROM face_analyses fa
@@ -210,8 +239,55 @@ app.get('/api/profile', authenticate, async (request, response, next) => {
   }
 });
 
+app.patch('/api/profile', authenticate, async (request, response, next) => {
+  const fullName = String(request.body.fullName || '').trim();
+  const email = String(request.body.email || '').trim().toLowerCase();
+  const phone = optionalText(request.body.phone, 30);
+  const hairType = optionalText(request.body.hairType, 50);
+  const hairLength = optionalText(request.body.hairLength, 50);
+  const hairTexture = optionalText(request.body.hairTexture, 50);
+  const imageData = request.body.imageData;
+  if (fullName.length < 2 || fullName.length > 120 || !/^\S+@\S+\.\S+$/.test(email)) {
+    return response.status(400).json({ error: 'Enter a valid name and email address.' });
+  }
+  let nextImagePath;
+  let previousImagePath;
+  try {
+    const [users] = await pool.execute('SELECT profile_image_path AS profileImageUrl FROM users WHERE id = ? LIMIT 1', [request.user.sub]);
+    if (!users[0]) return response.status(404).json({ error: 'Profile not found.' });
+    previousImagePath = users[0].profileImageUrl;
+    nextImagePath = previousImagePath;
+    if (typeof imageData === 'string') nextImagePath = await storeManagedImage(imageData, 'profile', request.user.sub, request.user.sub);
+    else if (imageData === null) nextImagePath = null;
+
+    await pool.execute(
+      'UPDATE users SET full_name = ?, email = ?, phone = ?, profile_image_path = ? WHERE id = ?',
+      [fullName, email, phone, nextImagePath, request.user.sub],
+    );
+    await pool.execute(
+      `INSERT INTO customer_profiles (user_id, hair_type, hair_length, hair_texture) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE hair_type = VALUES(hair_type), hair_length = VALUES(hair_length), hair_texture = VALUES(hair_texture)`,
+      [request.user.sub, hairType, hairLength, hairTexture],
+    );
+    if (previousImagePath && previousImagePath !== nextImagePath) await removeManagedImage(previousImagePath, 'profile');
+    const [updated] = await pool.execute(
+      `SELECT u.id, u.full_name AS fullName, u.email, u.phone, u.role, u.created_at AS createdAt,
+              u.profile_image_path AS profileImageUrl, cp.hair_type AS hairType,
+              cp.hair_length AS hairLength, cp.hair_texture AS hairTexture,
+              (SELECT fa.face_shape FROM face_analyses fa WHERE fa.user_id = u.id ORDER BY fa.created_at DESC, fa.id DESC LIMIT 1) AS faceShape
+       FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id WHERE u.id = ? LIMIT 1`,
+      [request.user.sub],
+    );
+    return response.json({ data: updated[0] });
+  } catch (error) {
+    if (nextImagePath && nextImagePath !== previousImagePath) await removeManagedImage(nextImagePath, 'profile').catch(() => {});
+    return next(error);
+  }
+});
+
 app.get('/api/owner/dashboard', authenticate, async (request, response, next) => {
   if (request.user.role !== 'owner') return response.status(403).json({ error: 'Salon owner access is required.' });
+  response.set('Cache-Control', 'no-store');
   try {
     const [rows] = await pool.execute(
       `SELECT s.id, s.name, s.address, s.phone, s.profile_image_path AS profileImageUrl,
@@ -230,6 +306,48 @@ app.get('/api/owner/dashboard', authenticate, async (request, response, next) =>
     if (!rows[0]) return response.status(404).json({ error: 'No salon is linked to this owner account.' });
     return response.json({ data: rows[0] });
   } catch (error) {
+    return next(error);
+  }
+});
+
+app.post('/api/owner/salon', authenticate, async (request, response, next) => {
+  if (!requireOwner(request, response)) return;
+  const name = String(request.body.name || '').trim();
+  const address = String(request.body.address || '').trim();
+  const city = String(request.body.city || '').trim();
+  const latitude = Number(request.body.latitude);
+  const longitude = Number(request.body.longitude);
+  const logoData = request.body.logoData;
+  if (name.length < 2 || address.length < 5 || city.length < 2 || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return response.status(400).json({ error: 'Enter your salon name, address, city, and a valid map location.' });
+  }
+  let logoPath = null;
+  try {
+    const [existing] = await pool.execute('SELECT id FROM salons WHERE owner_id = ? LIMIT 1', [request.user.sub]);
+    if (existing[0]) return response.status(409).json({ error: 'This owner already has a salon.' });
+    const [unclaimed] = await pool.execute('SELECT id FROM salons WHERE owner_id IS NULL AND LOWER(name) = LOWER(?) LIMIT 1', [name]);
+    let salonId = unclaimed[0]?.id;
+    if (salonId) {
+      await pool.execute(
+        `UPDATE salons SET owner_id = ?, address = ?, city = ?, latitude = ?, longitude = ?,
+                source = 'owner-registration', is_active = TRUE WHERE id = ?`,
+        [request.user.sub, address, city, latitude, longitude, salonId],
+      );
+    } else {
+      const [result] = await pool.execute(
+        `INSERT INTO salons (owner_id, name, address, city, latitude, longitude, source, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, 'owner-registration', TRUE)`,
+        [request.user.sub, name, address, city, latitude, longitude],
+      );
+      salonId = result.insertId;
+    }
+    if (typeof logoData === 'string') {
+      logoPath = await storeManagedImage(logoData, 'salon', request.user.sub, salonId);
+      await pool.execute('UPDATE salons SET profile_image_path = ? WHERE id = ?', [logoPath, salonId]);
+    }
+    return response.status(201).json({ data: { id: salonId, name, address, city, latitude, longitude, profileImageUrl: logoPath } });
+  } catch (error) {
+    if (logoPath) await removeManagedImage(logoPath, 'salon').catch(() => {});
     return next(error);
   }
 });
@@ -721,6 +839,7 @@ app.patch('/api/privacy-settings', authenticate, async (request, response, next)
 });
 
 app.get('/api/salons', async (request, response, next) => {
+  response.set('Cache-Control', 'no-store');
   try {
     const search = String(request.query.search || '').trim();
     const pattern = `%${search}%`;

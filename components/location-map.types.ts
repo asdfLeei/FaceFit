@@ -7,6 +7,7 @@ export type LocationMapSalon = MapCoordinate & {
   id: number;
   name: string;
   address: string;
+  profileImageUrl?: string | null;
 };
 
 export type LocationMapProps = {

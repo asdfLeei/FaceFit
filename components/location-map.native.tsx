@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
 import type { LocationMapProps } from './location-map.types';
@@ -58,8 +58,7 @@ export function LocationMap({ coordinate, salons = [], onSelectSalon }: Location
               description={salon.address}
               onCalloutPress={() => onSelectSalon?.(salon.id)}>
               <View style={styles.salonLogo}>
-                <Ionicons name="storefront" size={15} color="#FFFFFF" />
-                <Text style={styles.salonInitials}>{initials}</Text>
+                {salon.profileImageUrl ? <Image source={{ uri: salon.profileImageUrl }} style={styles.salonLogoImage} /> : <><Ionicons name="storefront" size={15} color="#FFFFFF" /><Text style={styles.salonInitials}>{initials}</Text></>}
               </View>
             </Marker>
           );
@@ -117,4 +116,5 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.5,
   },
+  salonLogoImage: { width: 40, height: 40, borderRadius: 12, resizeMode: 'cover' },
 });

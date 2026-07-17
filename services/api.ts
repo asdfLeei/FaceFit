@@ -77,6 +77,7 @@ export type MySalonReview = {
 export type AuthUser = { id: number; fullName: string; email: string; phone: string | null; role: string };
 export type UserProfile = AuthUser & {
   createdAt: string;
+  profileImageUrl: string | null;
   hairType: string | null;
   hairLength: string | null;
   hairTexture: string | null;
@@ -196,7 +197,7 @@ export function getApiAssetUrl(path?: string | null) {
 }
 
 async function apiRequest<T>(path: string): Promise<T> {
-  const response = await fetchApi(path);
+  const response = await fetchApi(path, { cache: 'no-store' });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error || `API request failed (${response.status})`);
@@ -215,7 +216,7 @@ async function apiPost<T>(path: string, body: object): Promise<T> {
   return result as T;
 }
 
-export async function signup(input: { fullName: string; email: string; phone: string; password: string; role: 'customer' | 'owner' }) {
+export async function signup(input: { fullName: string; email: string; phone: string; password: string; role: 'customer' | 'owner'; salonName?: string; salonAddress?: string; salonCity?: string; latitude?: number; longitude?: number; salonLogoData?: string }) {
   return (await apiPost<AuthResponse>('/api/auth/signup', input)).data;
 }
 
@@ -232,13 +233,36 @@ export async function getProfile(token: string) {
   return (result as { data: UserProfile }).data;
 }
 
+export async function updateProfile(token: string, input: { fullName: string; email: string; phone: string; hairType: string; hairLength: string; hairTexture: string; imageData?: string | null }) {
+  const response = await fetchApi('/api/profile', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error || `API request failed (${response.status})`);
+  return (result as { data: UserProfile }).data;
+}
+
 export async function getOwnerDashboard(token: string) {
   const response = await fetchApi('/api/owner/dashboard', {
     headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
   });
   const result = await response.json().catch(() => null);
   if (!response.ok) throw new Error(result?.error || `API request failed (${response.status})`);
   return (result as { data: OwnerDashboard }).data;
+}
+
+export async function createOwnerSalon(token: string, input: { name: string; address: string; city: string; latitude: number; longitude: number; logoData?: string }) {
+  const response = await fetchApi('/api/owner/salon', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error || `API request failed (${response.status})`);
+  return result.data;
 }
 
 export async function getOwnerManagement(token: string) {

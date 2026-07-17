@@ -4,6 +4,7 @@ export type SalonMapItem = {
   address: string;
   latitude: number;
   longitude: number;
+  profileImageUrl?: string | null;
 };
 
 export type SalonMapProps = {

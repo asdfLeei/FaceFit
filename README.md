@@ -20,6 +20,8 @@ FaceFit is a modern platform that connects customers with professional hairstyli
 
 ## Project Structure
 
+> **Current architecture:** The active customer, stylist, and salon-owner flows are consolidated in `app/index.tsx`. The old mock `/dashboard` route and its separate role-specific dashboard files have been removed. Some older sections below are retained as historical project notes.
+
 ```
 FaceFit/
 ├── app/

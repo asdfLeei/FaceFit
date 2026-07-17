@@ -10,10 +10,13 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(190) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   phone VARCHAR(30),
+  profile_image_path VARCHAR(500),
   role ENUM('customer', 'stylist', 'owner', 'admin') NOT NULL DEFAULT 'customer',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image_path VARCHAR(500) AFTER phone;
 
 CREATE TABLE IF NOT EXISTS customer_profiles (
   user_id BIGINT UNSIGNED PRIMARY KEY,
