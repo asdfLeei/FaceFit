@@ -19,6 +19,7 @@ import {
   Animated,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -440,12 +441,6 @@ export default function FaceFitPrototype() {
     }
   }, []);
   useEffect(() => { void loadSalons(); }, [loadSalons]);
-  useEffect(() => {
-    if (screen !== 'home' && screen !== 'salons') return;
-    void loadSalons();
-    const salonRefreshTimer = setInterval(() => void loadSalons(), 15000);
-    return () => clearInterval(salonRefreshTimer);
-  }, [loadSalons, screen]);
   const loadBookings = useCallback(async () => {
     if (!authToken) return;
     setBookingsLoading(true);
@@ -638,7 +633,27 @@ export default function FaceFitPrototype() {
   }, [authToken]);
   useEffect(() => { void loadNotificationCount(); }, [loadNotificationCount, screen]);
 
-  const openNotification = (item: AccountItem, owner: boolean) => {
+  const openNotification = async (item: AccountItem, owner: boolean) => {
+    if (!owner && item.destination === 'reviews' && item.salonId) {
+      const salonId = Number(item.salonId);
+      let salon = salonRecords.find(record => record.id === salonId);
+
+      if (!salon) {
+        try {
+          const latestSalons = await getSalons();
+          setSalonRecords(latestSalons);
+          salon = latestSalons.find(record => record.id === salonId);
+        } catch {
+          // The standard reviews destination below remains available if salons cannot be refreshed.
+        }
+      }
+
+      if (salon) {
+        await openSalon(salon);
+        return;
+      }
+    }
+
     const destinations: Record<string, Screen> = {
       bookings: 'bookings',
       reviews: 'reviews',
@@ -900,15 +915,31 @@ export default function FaceFitPrototype() {
     if (isGettingLocation) return;
     setIsGettingLocation(true);
     try {
-      const servicesEnabled = await Location.hasServicesEnabledAsync();
-      if (!servicesEnabled) {
-        Alert.alert('Location is turned off', 'Turn on location services, then try View map again.');
+      const permissionResult = await Location.requestForegroundPermissionsAsync();
+      if (permissionResult.status !== Location.PermissionStatus.GRANTED) {
+        if (!permissionResult.canAskAgain) {
+          Alert.alert(
+            'Location permission is blocked',
+            'Open FaceFit settings and allow location access to use the nearby map.',
+            [{ text: 'Cancel', style: 'cancel' }, { text: 'Open settings', onPress: () => void Linking.openSettings() }],
+          );
+        } else {
+          Alert.alert('Location permission needed', 'Tap View map again and choose Allow while using the app.');
+        }
         return;
       }
 
-      const permissionResult = await Location.requestForegroundPermissionsAsync();
-      if (permissionResult.status !== Location.PermissionStatus.GRANTED) {
-        Alert.alert('Location permission needed', 'Allow location while using FaceFit to open a map at your current position.');
+      let servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled && Platform.OS === 'android') {
+        try {
+          await Location.enableNetworkProviderAsync();
+          servicesEnabled = await Location.hasServicesEnabledAsync();
+        } catch {
+          // The user can still enable location from the system settings.
+        }
+      }
+      if (!servicesEnabled) {
+        Alert.alert('Location is turned off', 'Turn on device location, then try View map again.');
         return;
       }
 
@@ -1000,7 +1031,7 @@ export default function FaceFitPrototype() {
     ['heart-outline','Saved hairstyles','saved'], ['storefront-outline','Saved salons','saved-salons'], ['notifications-outline','Notifications','notifications'], ['star-outline','My reviews','reviews'], ['shield-checkmark-outline','Privacy & settings','settings']
   ].map(x => <Pressable key={x[1]} onPress={() => x[2] === 'notifications' ? showNotifications('profile') : setScreen(x[2] as Screen)} style={s.menuRow}><View style={s.menuIcon}><Ionicons name={x[0] as keyof typeof Ionicons.glyphMap} size={21} color={C.rose} /></View><Text style={[s.cardTitle, { flex: 1 }]}>{x[1]}</Text>{x[2] === 'notifications' && notificationUnreadCount > 0 && <View style={s.notificationMenuCount}><Text style={s.notificationBadgeText}>{notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}</Text></View>}<Ionicons name="chevron-forward" size={20} color={C.muted} /></Pressable>)}</ScreenFrame>;
 
-  const notificationPage = (owner: boolean) => <ScreenFrame><Header title="Notifications" onBack={() => setScreen(owner ? 'owner-dashboard' : notificationReturnScreen)} />{accountLoading ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : accountError ? <Pressable onPress={() => void loadAccountScreen()} style={s.dataState}><Text style={s.cardTitle}>Could not load notifications</Text><Text style={s.small}>{accountError} · Tap to retry</Text></Pressable> : accountItems.length === 0 ? <View style={s.empty}><Ionicons name="notifications-outline" size={40} color="#CDBEC2" /><Text style={s.cardTitle}>No notifications yet</Text><Text style={s.small}>Booking and review updates will appear here.</Text></View> : <View style={s.notificationList}>{accountItems.map(item => { const unread = !Boolean(item.isRead); return <Pressable accessibilityRole="button" accessibilityState={{ selected: unread }} key={item.id} onPress={() => openNotification(item, owner)} style={({ pressed }) => [s.notificationCard, unread && s.notificationCardUnread, pressed && s.pressed]}><View style={[s.notificationIcon, unread && s.notificationIconUnread]}><Ionicons name={item.destination?.includes('review') ? 'star-outline' : 'calendar-outline'} size={21} color={unread ? C.white : C.rose} /></View><View style={s.salonCardGrow}><View style={s.notificationTitleRow}><Text style={[s.cardTitle, !unread && s.notificationTitleRead]}>{item.title}</Text>{unread && <View style={s.notificationUnreadDot} />}</View>{item.detail && <Text style={s.small}>{item.detail}</Text>}<View style={s.notificationFooter}><Text style={s.notificationDate}>{new Date(item.createdAt).toLocaleString()}</Text>{unread && <Pressable accessibilityRole="button" accessibilityLabel={`Mark ${item.title} as read`} onPress={event => { event.stopPropagation(); readNotification(item); }} style={({ pressed }) => [s.notificationReadButton, pressed && s.pressed]}><Ionicons name="checkmark" size={14} color={C.roseDark} /><Text style={s.notificationReadButtonText}>Mark as read</Text></Pressable>}</View></View>{item.destination && <Ionicons name="chevron-forward" size={19} color={C.muted} />}</Pressable>; })}</View>}</ScreenFrame>;
+  const notificationPage = (owner: boolean) => <ScreenFrame><Header title="Notifications" onBack={() => setScreen(owner ? 'owner-dashboard' : notificationReturnScreen)} />{accountLoading ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : accountError ? <Pressable onPress={() => void loadAccountScreen()} style={s.dataState}><Text style={s.cardTitle}>Could not load notifications</Text><Text style={s.small}>{accountError} · Tap to retry</Text></Pressable> : accountItems.length === 0 ? <View style={s.empty}><Ionicons name="notifications-outline" size={40} color="#CDBEC2" /><Text style={s.cardTitle}>No notifications yet</Text><Text style={s.small}>Booking and review updates will appear here.</Text></View> : <View style={s.notificationList}>{accountItems.map(item => { const unread = !Boolean(item.isRead); return <Pressable accessibilityRole="button" accessibilityState={{ selected: unread }} key={item.id} onPress={() => void openNotification(item, owner)} style={({ pressed }) => [s.notificationCard, unread && s.notificationCardUnread, pressed && s.pressed]}><View style={[s.notificationIcon, unread && s.notificationIconUnread]}><Ionicons name={item.destination?.includes('review') ? 'star-outline' : 'calendar-outline'} size={21} color={unread ? C.white : C.rose} /></View><View style={s.salonCardGrow}><View style={s.notificationTitleRow}><Text style={[s.cardTitle, !unread && s.notificationTitleRead]}>{item.title}</Text>{unread && <View style={s.notificationUnreadDot} />}</View>{item.detail && <Text style={s.small}>{item.detail}</Text>}<View style={s.notificationFooter}><Text style={s.notificationDate}>{new Date(item.createdAt).toLocaleString()}</Text>{unread && <Pressable accessibilityRole="button" accessibilityLabel={`Mark ${item.title} as read`} onPress={event => { event.stopPropagation(); readNotification(item); }} style={({ pressed }) => [s.notificationReadButton, pressed && s.pressed]}><Ionicons name="checkmark" size={14} color={C.roseDark} /><Text style={s.notificationReadButtonText}>Mark as read</Text></Pressable>}</View></View>{item.destination && <Ionicons name="chevron-forward" size={19} color={C.muted} />}</Pressable>; })}</View>}</ScreenFrame>;
 
   const accountPage = (title: string) => <ScreenFrame><Header title={title} onBack={() => setScreen('profile')} />{accountLoading ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : accountError ? <Pressable onPress={() => void loadAccountScreen()} style={s.dataState}><Text style={s.cardTitle}>Could not load {title.toLowerCase()}</Text><Text style={s.small}>{accountError} · Tap to retry</Text></Pressable> : accountItems.length === 0 ? <View style={s.empty}><Ionicons name={title === 'My reviews' ? 'star-outline' : 'heart-outline'} size={40} color="#CDBEC2" /><Text style={s.cardTitle}>Nothing here yet</Text><Text style={s.small}>Your {title.toLowerCase()} will appear here.</Text></View> : accountItems.map(item => <View style={s.listCard} key={item.id}><View style={s.menuIcon}><Ionicons name={title === 'My reviews' ? 'star' : 'heart'} size={20} color={C.rose} /></View><View style={{ flex: 1 }}><Text style={s.cardTitle}>{item.title}</Text>{item.detail && <Text style={s.small}>{item.detail}</Text>}<Text style={s.small}>{new Date(item.createdAt).toLocaleDateString()}</Text></View></View>)}</ScreenFrame>;
 

@@ -97,7 +97,7 @@ export type Booking = {
   salonName: string;
   stylistName: string | null;
 };
-export type AccountItem = { id: number; title: string; detail?: string; destination?: string | null; referenceId?: number | null; isRead?: boolean; createdAt: string };
+export type AccountItem = { id: number; title: string; detail?: string; destination?: string | null; referenceId?: number | null; salonId?: number | null; isRead?: boolean; createdAt: string };
 export type PrivacySettings = { notificationsEnabled: boolean; saveScanHistory: boolean };
 export type OwnerDashboard = {
   id: number;

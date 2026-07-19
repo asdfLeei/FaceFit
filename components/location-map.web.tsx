@@ -36,16 +36,25 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribu
 const userIcon=L.divIcon({className:'',html:'<div class="you-marker"></div>',iconSize:[34,34],iconAnchor:[17,17]});
 L.marker([current.latitude,current.longitude],{icon:userIcon,zIndexOffset:1000}).addTo(map).bindPopup('<b>You are here</b>');
 const bounds=[[current.latitude,current.longitude]];
-salons.forEach(s=>{const markerContent=s.profileImageUrl?'<img src="'+escapeHtml(s.profileImageUrl)+'" alt="">':storefront+'<small>'+escapeHtml(initials(s.name))+'</small>';const logo='<div class="salon-wrap"><div class="salon-marker">'+markerContent+'</div><div class="salon-label">'+escapeHtml(s.name)+'</div></div>';const icon=L.divIcon({className:'',html:logo,iconSize:[48,70],iconAnchor:[24,44],popupAnchor:[0,-42]});const marker=L.marker([s.latitude,s.longitude],{icon}).addTo(map);marker.bindPopup('<b>'+escapeHtml(s.name)+'</b><br>'+escapeHtml(s.address)+'<button class="open-button" onclick="parent.postMessage({type:\'${messageType}\',salonId:'+Number(s.id)+'},\'*\')">View salon</button>');bounds.push([s.latitude,s.longitude])});
+salons.forEach(s=>{const markerContent=s.profileImageUrl?'<img src="'+escapeHtml(s.profileImageUrl)+'" alt="">':storefront+'<small>'+escapeHtml(initials(s.name))+'</small>';const logo='<div class="salon-wrap"><div class="salon-marker">'+markerContent+'</div><div class="salon-label">'+escapeHtml(s.name)+'</div></div>';const icon=L.divIcon({className:'',html:logo,iconSize:[48,70],iconAnchor:[24,44],popupAnchor:[0,-42]});const marker=L.marker([s.latitude,s.longitude],{icon}).addTo(map);marker.bindPopup('<b>'+escapeHtml(s.name)+'</b><br>'+escapeHtml(s.address)+'<button class="open-button" data-salon-id="'+Number(s.id)+'">View salon</button>');bounds.push([s.latitude,s.longitude])});
+document.addEventListener('click',event=>{const button=event.target.closest('[data-salon-id]');if(button)parent.postMessage({type:'${messageType}',salonId:Number(button.dataset.salonId)},'*')});
 if(bounds.length>1)map.fitBounds(bounds,{padding:[55,55],maxZoom:16});
 </script></body></html>`;
 
   return <View style={styles.container}>{createElement('iframe', {
     allowFullScreen: true,
     srcDoc: html,
-    style: { border: 0, height: '100%', width: '100%' },
+    style: { border: 0, display: 'block', height: '100%', inset: 0, position: 'absolute', width: '100%' },
     title: `Your location and ${salons.length} nearby FaceFit salons`,
   })}</View>;
 }
 
-const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: '#EDE3E5' } });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    minHeight: 400,
+    position: 'relative',
+    width: '100%',
+    backgroundColor: '#EDE3E5',
+  },
+});

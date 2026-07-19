@@ -730,9 +730,12 @@ app.get('/api/account/:section', authenticate, async (request, response, next) =
   const queries = {
     saved: `SELECT id, hairstyle_name AS title, saved_at AS createdAt FROM saved_hairstyles WHERE user_id = ? ORDER BY saved_at DESC`,
     salons: `SELECT s.id, s.name AS title, s.address AS detail, fs.created_at AS createdAt FROM favorite_salons fs JOIN salons s ON s.id = fs.salon_id WHERE fs.user_id = ? ORDER BY fs.created_at DESC`,
-    notifications: `SELECT id, title, message AS detail, destination, reference_id AS referenceId,
-                           is_read AS isRead, created_at AS createdAt
-                    FROM notifications WHERE user_id = ? ORDER BY created_at DESC, id DESC`,
+    notifications: `SELECT n.id, n.title, n.message AS detail, n.destination, n.reference_id AS referenceId,
+                           CASE WHEN n.destination = 'reviews' THEN r.salon_id ELSE NULL END AS salonId,
+                           n.is_read AS isRead, n.created_at AS createdAt
+                    FROM notifications n
+                    LEFT JOIN reviews r ON n.destination = 'reviews' AND r.id = n.reference_id
+                    WHERE n.user_id = ? ORDER BY n.created_at DESC, n.id DESC`,
     reviews: `SELECT r.id, s.name AS title, CONCAT(r.rating, ' / 5', IF(r.comment IS NULL OR r.comment = '', '', CONCAT(' · ', r.comment))) AS detail, r.created_at AS createdAt FROM reviews r JOIN salons s ON s.id = r.salon_id WHERE r.user_id = ? ORDER BY r.created_at DESC`,
   };
   const query = queries[request.params.section];
