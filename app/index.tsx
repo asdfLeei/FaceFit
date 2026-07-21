@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FaceScanScreen } from '@/components/face-scan-screen';
+import { FaceLandmarkOverlay } from '@/components/face-landmark-overlay';
 import { CustomerDashboardScreen } from '@/components/dashboards/customer-dashboard-screen';
 import { OwnerDashboardScreen } from '@/components/dashboards/owner-dashboard-screen';
 import { OwnerSalonSetupScreen } from '@/components/dashboards/owner-salon-setup-screen';
@@ -12,7 +13,7 @@ import { OnboardingScreen } from '@/components/onboarding-screen';
 import { CustomerSettingsScreen } from '@/components/profile/customer-settings-screen';
 import { SalonMap } from '@/components/salon-map';
 import { SalonLocationPicker } from '@/components/salon-location-picker';
-import { createBooking, createOwnerPortfolioImage, createOwnerReviewReply, createOwnerSalon, createOwnerService, createOwnerStaff, createSalonReview, getAccountItems, getApiAssetUrl, getBookings, getFavoriteSalons, getMySalonReviews, getOwnerDashboard, getOwnerManagement, getPrivacySettings, getProfile, getSalonPortfolio, getSalonReviews, getSalons, getSalonServices, getSalonStaff, getUnreadNotificationCount, login as loginUser, markNotificationRead, removeOwnerPortfolioImage, removeOwnerReviewReply, removeOwnerService, removeOwnerStaff, saveHairstyle, setFavoriteSalon, signup as signupUser, updateOwnerBooking, updateOwnerProfile, updateOwnerService, updateOwnerStaff, updatePrivacySettings, updateSalonReview, type AccountItem, type AuthUser, type Booking, type OwnerDashboard, type OwnerManagement, type PortfolioImage, type PrivacySettings, type Salon, type SalonReview, type SalonReviewSummary, type SalonService, type SalonStaff, type UserProfile } from '@/services/api';
+import { createBooking, createOwnerPortfolioImage, createOwnerReviewReply, createOwnerSalon, createOwnerService, createOwnerStaff, createSalonReview, getAccountItems, getApiAssetUrl, getBookings, getFavoriteSalons, getMySalonReviews, getOwnerDashboard, getOwnerManagement, getProfile, getSalonPortfolio, getSalonReviews, getSalons, getSalonServices, getSalonStaff, getUnreadNotificationCount, login as loginUser, markNotificationRead, removeOwnerPortfolioImage, removeOwnerReviewReply, removeOwnerService, removeOwnerStaff, saveHairstyle, setFavoriteSalon, signup as signupUser, updateOwnerBooking, updateOwnerProfile, updateOwnerService, updateOwnerStaff, updateSalonReview, type AccountItem, type AuthUser, type Booking, type OwnerDashboard, type OwnerManagement, type PortfolioImage, type Salon, type SalonReview, type SalonReviewSummary, type SalonService, type SalonStaff, type UserProfile , analyzeFace, type FaceAnalysis } from '@/services/api';
 import {
   ActivityIndicator,
   Alert,
@@ -36,7 +37,7 @@ type Screen =
   | 'splash' | 'onboarding' | 'login' | 'signup' | 'consent' | 'home'
   | 'scan' | 'processing' | 'result' | 'recommendations' | 'style-detail'
   | 'salons' | 'salon-detail' | 'service' | 'stylist' | 'datetime' | 'summary' | 'success'
-  | 'bookings' | 'profile' | 'saved' | 'saved-salons' | 'notifications' | 'reviews' | 'settings'
+  | 'bookings' | 'profile' | 'saved' | 'saved-style-detail' | 'saved-salons' | 'notifications' | 'reviews' | 'settings'
   | 'stylist-dashboard' | 'stylist-appointments' | 'stylist-detail' | 'stylist-status' | 'stylist-notifications'
   | 'owner-dashboard' | 'owner-bookings' | 'owner-services' | 'owner-staff' | 'owner-profile' | 'owner-reviews' | 'owner-notifications';
 
@@ -68,12 +69,14 @@ async function chooseImage(context: string) {
 const C = { rose: '#A94F67', roseDark: '#743548', blush: '#F7E4E8', pale: '#FFF8F6', ink: '#292326', muted: '#7C7074', line: '#EDE3E5', white: '#FFFFFF', green: '#4F826B', gold: '#C48B3A' };
 const artwork = require('../assets/images/facefit-styles.png');
 const faceFitLogo = require('../assets/images/facefit-logo.png');
-const stylesList = [
-  { name: 'Soft Layered Lob', match: '96%', reason: 'Frames an oval face without hiding its balance.' },
-  { name: 'Textured Pixie', match: '92%', reason: 'Adds lift and highlights your cheekbones.' },
-  { name: 'Curly Shag', match: '89%', reason: 'Soft volume complements your natural proportions.' },
-  { name: 'Curtain Layers', match: '86%', reason: 'Face-framing movement creates gentle definition.' },
-];
+const shapeCopy: Record<FaceAnalysis['faceShape'], { title: string; description: string }> = {
+  oval: { title: 'Balanced & versatile', description: 'Your face is slightly longer than it is wide, with a softly tapered jaw.' },
+  round: { title: 'Soft & proportionate', description: 'Your face length and width are similar, with a gently curved jawline.' },
+  square: { title: 'Defined & structured', description: 'Your forehead, cheekbones, and jaw have similar widths with a defined jawline.' },
+  heart: { title: 'Broad & tapered', description: 'Your forehead is wider while the lower face narrows toward the chin.' },
+  oblong: { title: 'Long & elegant', description: 'Your face is noticeably longer than it is wide with relatively even side proportions.' },
+  diamond: { title: 'Angular & sculpted', description: 'Your cheekbones are the widest point, with a narrower forehead and jaw.' },
+};
 
 function Button({ label, onPress, secondary = false, icon, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; icon?: keyof typeof Ionicons.glyphMap; disabled?: boolean }) {
   return <Pressable disabled={disabled} accessibilityRole="button" accessibilityState={{ disabled }} onPress={onPress} style={({ pressed }) => [s.button, secondary && s.buttonSecondary, disabled && s.buttonDisabled, pressed && s.pressed]}>
@@ -187,7 +190,9 @@ function TabBar({ screen, go }: { screen: Screen; go: (x: Screen) => void }) {
     { key: 'profile', label: 'Profile', icon: 'person-outline' },
   ];
   return <View style={[s.tabBar, Platform.OS === 'web' && s.tabBarWeb]}>{tabs.map(t => {
-    const active = screen === t.key || (t.key === 'scan' && ['processing', 'result', 'recommendations', 'style-detail'].includes(screen));
+    const active = screen === t.key
+      || (t.key === 'scan' && ['processing', 'result', 'recommendations', 'style-detail'].includes(screen))
+      || (t.key === 'profile' && screen === 'settings');
     return <Pressable key={t.key} onPress={() => go(t.key)} style={s.tabItem}><Ionicons name={active ? (t.icon.replace('-outline', '') as keyof typeof Ionicons.glyphMap) : t.icon} size={22} color={active ? C.rose : C.muted} /><Text style={[s.tabLabel, active && s.tabActive]}>{t.label}</Text></Pressable>;
   })}</View>;
 }
@@ -332,7 +337,9 @@ function DesktopNavigation({ screen, go }: { screen: Screen; go: (screen: Screen
     <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Collapse FaceFit menu' : 'Keep FaceFit menu open'} onPress={() => setPinned(value => !value)} style={s.desktopBrand}><View style={s.logoSmall}><Image accessibilityLabel="FaceFit logo" source={faceFitLogo} style={s.logoImageSmall} /></View><Animated.Text numberOfLines={1} style={[s.desktopBrandText, { opacity: detailOpacity }]}>FACEFIT</Animated.Text></Pressable>
     <Animated.Text style={[s.desktopNavLabel, { opacity: detailOpacity }]}>MENU</Animated.Text>
     <View style={s.desktopNavItems}>{items.map(item => {
-      const active = screen === item.key || (item.key === 'scan' && ['processing', 'result', 'recommendations', 'style-detail'].includes(screen));
+      const active = screen === item.key
+        || (item.key === 'scan' && ['processing', 'result', 'recommendations', 'style-detail'].includes(screen))
+        || (item.key === 'profile' && screen === 'settings');
       return <Pressable accessibilityRole="button" accessibilityLabel={item.label} key={item.key} onPress={() => selectNavigationItem(item.key)} style={({ pressed }) => [s.desktopNavItem, active && s.desktopNavItemActive, pressed && s.pressed]}><View style={s.desktopNavIcon}><Ionicons name={active ? (item.icon.replace('-outline', '') as keyof typeof Ionicons.glyphMap) : item.icon} size={20} color={active ? C.rose : C.muted} /></View><Animated.Text numberOfLines={1} style={[s.desktopNavText, active && s.desktopNavTextActive, { opacity: detailOpacity }]}>{item.label}</Animated.Text></Pressable>;
     })}</View>
     <Animated.View pointerEvents={expanded ? 'auto' : 'none'} style={[s.desktopHelp, { opacity: detailOpacity }]}><Ionicons name="sparkles" size={21} color={C.gold} /><Text style={s.cardTitle}>Your style space</Text><Text style={s.small}>Scan, discover, and book your next look.</Text></Animated.View>
@@ -348,8 +355,11 @@ export default function FaceFitPrototype() {
   const [locationConsent, setLocationConsent] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [mapVisible, setMapVisible] = useState(false);
+  const [salonDetailReturn, setSalonDetailReturn] = useState<'salons' | 'nearby-map' | 'saved-salons' | 'reviews'>('salons');
   const [currentLocation, setCurrentLocation] = useState<MapCoordinate | null>(null);
   const [uploaded, setUploaded] = useState<string | null>(null);
+  const [faceAnalysis, setFaceAnalysis] = useState<FaceAnalysis | null>(null);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<FaceAnalysis['recommendations'][number] | null>(null);
   const [salonRecords, setSalonRecords] = useState<Salon[]>([]);
   const [selectedSalon, setSelectedSalon] = useState<Salon | null>(null);
   const [salonServices, setSalonServices] = useState<SalonService[]>([]);
@@ -379,11 +389,11 @@ export default function FaceFitPrototype() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [accountItems, setAccountItems] = useState<AccountItem[]>([]);
+  const [selectedAccountItem, setSelectedAccountItem] = useState<AccountItem | null>(null);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [notificationReturnScreen, setNotificationReturnScreen] = useState<Screen>('home');
   const [accountLoading, setAccountLoading] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
-  const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [favoriteSalonIds, setFavoriteSalonIds] = useState<number[]>([]);
   const [savingFavoriteSalonIds, setSavingFavoriteSalonIds] = useState<number[]>([]);
   const [favoriteToast, setFavoriteToast] = useState<{ message: string; success: boolean } | null>(null);
@@ -428,7 +438,6 @@ export default function FaceFitPrototype() {
   const mainScreens = ['home', 'scan', 'processing', 'result', 'recommendations', 'style-detail', 'salons', 'bookings', 'profile'] as Screen[];
 
   useEffect(() => { if (screen === 'splash') { const t = setTimeout(() => setScreen('onboarding'), 1400); return () => clearTimeout(t); } }, [screen]);
-  useEffect(() => { if (screen === 'processing') { const t = setTimeout(() => setScreen('result'), 2200); return () => clearTimeout(t); } }, [screen]);
   const loadSalons = useCallback(async () => {
     setSalonsLoading(true);
     setSalonsError(null);
@@ -606,12 +615,11 @@ export default function FaceFitPrototype() {
   };
 
   const loadAccountScreen = useCallback(async () => {
-    if (!authToken || !['saved', 'saved-salons', 'notifications', 'owner-notifications', 'reviews', 'settings'].includes(screen)) return;
+    if (!authToken || !['saved', 'saved-salons', 'notifications', 'owner-notifications', 'reviews'].includes(screen)) return;
     setAccountLoading(true);
     setAccountError(null);
     try {
-      if (screen === 'settings') setPrivacySettings(await getPrivacySettings(authToken));
-      else setAccountItems(await getAccountItems(authToken, screen === 'saved-salons' ? 'salons' : screen === 'owner-notifications' ? 'notifications' : screen as 'saved' | 'notifications' | 'reviews'));
+      setAccountItems(await getAccountItems(authToken, screen === 'saved-salons' ? 'salons' : screen === 'owner-notifications' ? 'notifications' : screen as 'saved' | 'notifications' | 'reviews'));
     } catch (error) {
       setAccountError(error instanceof Error ? error.message : 'Unable to load this page.');
     } finally {
@@ -754,20 +762,9 @@ export default function FaceFitPrototype() {
     void syncFavoriteSalon(salonId, salonName, authToken);
   };
 
-  const changePrivacySetting = async (key: keyof PrivacySettings) => {
-    if (!authToken || !privacySettings) return;
-    const next = { ...privacySettings, [key]: !privacySettings[key] };
-    setPrivacySettings(next);
-    try {
-      setPrivacySettings(await updatePrivacySettings(authToken, next));
-    } catch (error) {
-      setPrivacySettings(privacySettings);
-      Alert.alert('Unable to save setting', error instanceof Error ? error.message : 'Please try again.');
-    }
-  };
-
-  const openSalon = async (salon: Salon) => {
+  const openSalon = async (salon: Salon, returnTo: 'salons' | 'nearby-map' | 'saved-salons' | 'reviews' = 'salons') => {
     const requestId = ++salonLoadRequestRef.current;
+    setSalonDetailReturn(returnTo);
     setSelectedSalon(salon);
     setSalonServices([]);
     setSalonStaff([]);
@@ -907,9 +904,23 @@ export default function FaceFitPrototype() {
   const selectedDateLabel = selectedAppointment?.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) || 'Choose a date';
   const selectedTimeLabel = selectedAppointment?.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) || 'Choose a time';
 
-  const processScan = (uri: string) => {
+  const processScan = async ({ uri, imageData }: { uri: string; imageData: string }) => {
+    if (!authToken) {
+      Alert.alert('Log in required', 'Please log in before analyzing your face.');
+      setScreen('login');
+      return;
+    }
     setUploaded(uri);
+    setFaceAnalysis(null);
+    setSelectedRecommendation(null);
     setScreen('processing');
+    try {
+      setFaceAnalysis(await analyzeFace(authToken, imageData));
+      setScreen('result');
+    } catch (error) {
+      Alert.alert('Face analysis failed', error instanceof Error ? error.message : 'Please try another photo.');
+      setScreen('scan');
+    }
   };
   const openCurrentLocationMap = async () => {
     if (isGettingLocation) return;
@@ -970,11 +981,13 @@ export default function FaceFitPrototype() {
 
   const processing = <ScreenFrame scroll={false}><View style={s.centerPage}><View style={s.processIcon}><Ionicons name="scan" size={50} color={C.rose} /><ActivityIndicator color={C.rose} size="large" style={StyleSheet.absoluteFill} /></View><Text style={s.title}>Analyzing your face shape…</Text><Text style={[s.body, s.centerText]}>Mapping landmarks, measuring proportions, and ranking hairstyles for you.</Text><View style={s.steps}>{['Preprocessing image', 'Detecting face landmarks', 'Classifying face shape', 'Matching hairstyles'].map((x, i) => <View style={s.step} key={x}><View style={[s.stepDot, i < 2 && s.stepDone]}>{i < 2 && <Ionicons name="checkmark" size={13} color={C.white} />}</View><Text style={s.small}>{x}</Text></View>)}</View></View></ScreenFrame>;
 
-  const result = <ScreenFrame><Header title="Your result" onBack={() => setScreen('home')} action="share-outline" /><Text style={s.eyebrow}>FACE SHAPE DETECTED</Text><Text style={s.display}>Oval</Text><View style={s.resultVisual}>{uploaded ? <Image source={{ uri: uploaded }} style={s.resultImage} /> : <Art height={230} quadrant={0} />}<View style={s.outlineOval} /><View style={s.confidence}><Text style={s.confidenceText}>94% confidence</Text></View></View><Text style={s.sectionTitle}>Balanced & versatile</Text><Text style={s.body}>Your face is slightly longer than it is wide, with a gently rounded jaw. Most cuts suit you—especially styles that preserve your natural balance.</Text><View style={s.chipRow}>{['Soft layers', 'Curtain bangs', 'Textured bob'].map(x => <View style={s.chip} key={x}><Text style={s.chipText}>{x}</Text></View>)}</View><Button label="See my hairstyle matches" onPress={() => setScreen('recommendations')} icon="sparkles" /><Button label="Scan again" onPress={() => setScreen('scan')} secondary /></ScreenFrame>;
+  const result = faceAnalysis ? <ScreenFrame><Header title="Your result" onBack={() => setScreen('home')} action="share-outline" /><Text style={s.eyebrow}>MOST LIKELY FACE SHAPE</Text><Text style={s.display}>{faceAnalysis.faceShape.charAt(0).toUpperCase() + faceAnalysis.faceShape.slice(1)}</Text><View style={s.resultVisual}>{uploaded ? <FaceLandmarkOverlay uri={uploaded} imageSize={faceAnalysis.imageSize} landmarks={faceAnalysis.landmarks} /> : <Art height={230} quadrant={0} />}</View><Text style={s.sectionTitle}>{shapeCopy[faceAnalysis.faceShape].title}</Text><Text style={s.body}>{shapeCopy[faceAnalysis.faceShape].description} This estimate comes from normalized facial-landmark measurements.</Text><Text style={s.eyebrow}>SCAN MEASUREMENTS</Text><View style={s.chipRow}><View style={s.chip}><Text style={s.chipText}>Length {faceAnalysis.measurements.lengthToWidth.toFixed(2)}× width</Text></View><View style={s.chip}><Text style={s.chipText}>Jaw {faceAnalysis.measurements.jawToCheek.toFixed(2)}× cheeks</Text></View><View style={s.chip}><Text style={s.chipText}>Forehead {faceAnalysis.measurements.foreheadToCheek.toFixed(2)}× cheeks</Text></View></View><Button label="See my hairstyle matches" onPress={() => setScreen('recommendations')} icon="sparkles" /><Button label="Scan again" onPress={() => setScreen('scan')} secondary /></ScreenFrame> : processing;
 
-  const recommendations = <ScreenFrame><Header title="Top matches" onBack={() => setScreen('result')} action="heart-outline" /><Text style={s.body}>Ranked for your oval face, texture, and style goals.</Text><View style={s.chatBox}><Ionicons name="sparkles" size={19} color={C.rose} /><TextInput style={s.chatInput} placeholder="Refine: shorter, curly, low-maintenance…" placeholderTextColor="#9A8D91" /><Ionicons name="arrow-up-circle" size={27} color={C.rose} /></View>{stylesList.map((item, i) => <Pressable onPress={() => setScreen('style-detail')} style={s.recCard} key={item.name}><Art height={142} quadrant={i} /><View style={s.matchBadge}><Text style={s.matchText}>{item.match} match</Text></View><View style={s.recBody}><View style={s.sectionHead}><Text style={s.cardTitle}>{item.name}</Text><Ionicons name="heart-outline" size={20} color={C.rose} /></View><Text style={s.small}>{item.reason}</Text></View></Pressable>)}</ScreenFrame>;
+  const menMatches = (faceAnalysis?.recommendations || []).filter(item => item.audience === 'men');
+  const recommendationCard = (item: FaceAnalysis['recommendations'][number]) => <Pressable onPress={() => { setSelectedRecommendation(item); setScreen('style-detail'); }} style={s.recCard} key={`${item.audience}-${item.name}`}><View style={s.matchBadge}><Text style={s.matchText}>{item.score}% match</Text></View><View style={s.recBody}><View style={s.sectionHead}><Text style={s.cardTitle}>{item.name}</Text><Ionicons name="chevron-forward" size={20} color={C.rose} /></View><Text style={s.small}>{item.reason}</Text></View></Pressable>;
+  const recommendations = <ScreenFrame><Header title="Men's top matches" onBack={() => setScreen('result')} action="heart-outline" /><Text style={s.body}>Men&apos;s hairstyles ranked for your {faceAnalysis?.faceShape || 'detected'} face shape and facial proportions.</Text><View style={s.chatBox}><Ionicons name="sparkles" size={19} color={C.rose} /><TextInput style={s.chatInput} placeholder="Refine: shorter, curly, low-maintenance…" placeholderTextColor="#9A8D91" /><Ionicons name="arrow-up-circle" size={27} color={C.rose} /></View><Text style={s.matchSectionTitle}>Recommended for you</Text><Text style={s.matchSectionCopy}>Shapes and finishes selected for your facial structure.</Text>{menMatches.map(recommendationCard)}</ScreenFrame>;
 
-  const styleDetail = <ScreenFrame><Header title="Style details" onBack={() => setScreen('recommendations')} action="heart-outline" /><Art height={330} quadrant={0} /><View style={s.detailTitle}><View><Text style={s.title}>Soft Layered Lob</Text><Text style={s.matchText}>96% match for you</Text></View><View style={s.scoreCircle}><Text style={s.scoreText}>96</Text></View></View><Text style={s.sectionTitle}>Why it suits you</Text><Text style={s.body}>{"The collarbone length preserves your face's balanced proportions. Soft layers add movement around the cheeks without making the face appear longer."}</Text><View style={s.chipRow}>{['Medium length', 'Low upkeep', 'Works wavy'].map(x => <View style={s.chip} key={x}><Text style={s.chipText}>{x}</Text></View>)}</View><Button label="Save hairstyle" disabled={!authToken} onPress={() => { if (authToken) void saveHairstyle(authToken, 'Soft Layered Lob').then(() => Alert.alert('Saved', 'Soft Layered Lob was added to your saved hairstyles.')).catch(error => Alert.alert('Unable to save', error.message)); }} icon="heart" /><Button label="Find a salon for this style" onPress={() => setScreen('salons')} icon="location" /></ScreenFrame>;
+  const styleDetail = selectedRecommendation ? <ScreenFrame><Header title="Style details" onBack={() => setScreen('recommendations')} action="heart-outline" /><View style={s.detailTitle}><View style={{flex:1}}><Text style={s.eyebrow}>{selectedRecommendation.audience === 'men' ? "MEN'S STYLE" : "WOMEN'S STYLE"}</Text><Text style={s.title}>{selectedRecommendation.name}</Text><Text style={s.matchText}>{selectedRecommendation.score}% match for you</Text></View><View style={s.scoreCircle}><Text style={s.scoreText}>{selectedRecommendation.score}</Text></View></View><Text style={s.sectionTitle}>Why it suits you</Text><Text style={s.body}>{selectedRecommendation.reason}</Text><View style={s.chipRow}><View style={s.chip}><Text style={s.chipText}>{faceAnalysis?.faceShape} face</Text></View><View style={s.chip}><Text style={s.chipText}>Landmark matched</Text></View></View><Button label="Save hairstyle" disabled={!authToken} onPress={() => { if (authToken) void saveHairstyle(authToken, selectedRecommendation.name).then(() => Alert.alert('Saved', `${selectedRecommendation.name} was added to your saved hairstyles.`)).catch(error => Alert.alert('Unable to save', error.message)); }} icon="heart" /><Button label="Find a salon for this style" onPress={() => setScreen('salons')} icon="location" /></ScreenFrame> : recommendations;
 
   const normalizedSalonSearch = salonSearchQuery.trim().toLowerCase();
   const filteredSalonRecords = normalizedSalonSearch
@@ -989,7 +1002,7 @@ export default function FaceFitPrototype() {
   const salonHours = selectedSalon?.opening_time
     ? `${selectedSalon.opening_time.slice(0, 5)}${selectedSalon.closing_time ? `–${selectedSalon.closing_time.slice(0, 5)}` : ''}`
     : 'Contact for hours';
-  const salonDetail = <ScreenFrame><Header title="Salon profile" onBack={() => setScreen('salons')} action="heart-outline" favoriteActive={salonDetailFavorite} actionBusy={salonDetailFavoriteBusy} actionColor={C.rose} onAction={selectedSalon ? () => toggleFavoriteSalon(selectedSalon.id) : undefined} />{selectedSalon ? <>
+  const salonDetail = <ScreenFrame><Header title="Salon profile" onBack={() => { if (salonDetailReturn === 'nearby-map') { setScreen('home'); setMapVisible(true); } else { setScreen(salonDetailReturn); } }} action="heart-outline" favoriteActive={salonDetailFavorite} actionBusy={salonDetailFavoriteBusy} actionColor={C.rose} onAction={selectedSalon ? () => toggleFavoriteSalon(selectedSalon.id) : undefined} />{selectedSalon ? <>
     <View style={s.salonProfileHero}>
       <SalonLogo name={selectedSalon.name} imageUrl={selectedSalon.profileImageUrl} large />
       <View style={s.salonHeroContent}><Text style={s.salonProfileName}>{selectedSalon.name}</Text><View style={s.salonRatingRow}><Ionicons name="star" size={17} color="#FFD58A" /><Text style={s.salonRatingText}>{salonReviewSummary.count ? salonReviewSummary.average.toFixed(1) : 'New'}</Text><Text style={s.salonHeroMeta}>{salonReviewSummary.count ? `${salonReviewSummary.count} review${salonReviewSummary.count === 1 ? '' : 's'}` : 'Be the first to review'}</Text></View><Text style={s.salonHeroAddress}>{selectedSalon.address} · {selectedSalon.city}</Text></View>
@@ -1000,7 +1013,7 @@ export default function FaceFitPrototype() {
       <View style={s.salonInfoCard}><Ionicons name="people-outline" size={21} color={C.rose} /><Text style={s.salonInfoLabel}>Available staff</Text><Text style={s.salonInfoValue}>{salonStaff.length}</Text></View>
     </View>
     {selectedSalon.description && <View style={s.salonAbout}><Text style={s.salonSectionKicker}>ABOUT</Text><Text style={s.body}>{selectedSalon.description}</Text></View>}
-    {salonDetailError && <Pressable onPress={() => void openSalon(selectedSalon)} style={s.salonLoadWarning}><Ionicons name="refresh-circle" size={22} color={C.rose} /><Text style={s.authErrorText}>{salonDetailError}</Text></Pressable>}
+    {salonDetailError && <Pressable onPress={() => void openSalon(selectedSalon, salonDetailReturn)} style={s.salonLoadWarning}><Ionicons name="refresh-circle" size={22} color={C.rose} /><Text style={s.authErrorText}>{salonDetailError}</Text></Pressable>}
     {salonDetailLoading ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : <>
       {salonPortfolioImages.length > 0 && <><SectionTitle title="Business portfolio" /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.portfolioGallery}>{salonPortfolioImages.map(image => <View style={s.portfolioCustomerCard} key={image.id}><Image source={{ uri: getApiAssetUrl(image.imageUrl)! }} style={s.portfolioCustomerImage} />{image.caption && <Text numberOfLines={2} style={s.portfolioCaption}>{image.caption}</Text>}</View>)}</ScrollView></>}
       <SectionTitle title="Services & pricing" />
@@ -1028,14 +1041,37 @@ export default function FaceFitPrototype() {
   const bookings = <ScreenFrame><Header title="My bookings" action="notifications-outline" onAction={() => showNotifications('bookings')} actionBadge={notificationUnreadCount} />{bookingsLoading ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : bookingsError ? <Pressable onPress={() => void loadBookings()} style={s.dataState}><Ionicons name="cloud-offline-outline" size={28} color={C.rose} /><Text style={s.cardTitle}>Could not load bookings</Text><Text style={s.small}>{bookingsError} · Tap to retry</Text></Pressable> : bookingRecords.length === 0 ? <View style={s.empty}><Ionicons name="calendar-outline" size={40} color="#CDBEC2" /><Text style={s.cardTitle}>No appointments yet</Text><Text style={s.small}>Bookings you make with a salon will appear here.</Text></View> : bookingRecords.map(booking => <View style={s.bookingCard} key={booking.id}><Text style={s.eyebrow}>{new Date(booking.appointmentAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }).toUpperCase()}</Text><Text style={s.title}>{booking.serviceName}</Text><Text style={s.body}>{booking.salonName}{booking.stylistName ? ` · ${booking.stylistName}` : ''}</Text><View style={s.divider} /><View style={s.bookingMeta}><Text style={s.chipText}>₱{booking.price.toLocaleString()}</Text><Text style={s.chipText}>{booking.durationMinutes} min</Text><Text style={s.bookingStatus}>{booking.status}</Text></View></View>)}</ScreenFrame>;
 
   const profile = <ScreenFrame><Header title="Profile" action="settings-outline" />{profileLoading && !userProfile ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : profileError && !userProfile ? <Pressable onPress={() => void loadProfile()} style={s.dataState}><Ionicons name="cloud-offline-outline" size={26} color={C.rose} /><Text style={s.cardTitle}>Could not load profile</Text><Text style={s.small}>{profileError} · Tap to retry</Text></Pressable> : <><View style={s.profileHead}>{userProfile?.profileImageUrl ? <Image accessibilityLabel="Profile picture" source={{ uri: getApiAssetUrl(userProfile.profileImageUrl)! }} style={s.profileAvatarImage} /> : <View style={s.profileAvatar}><Text style={s.profileInitial}>{authUser?.fullName.charAt(0).toUpperCase() || '?'}</Text></View>}<View style={{ flex: 1 }}><Text style={s.title}>{userProfile?.fullName || authUser?.fullName || 'FaceFit user'}</Text></View></View><View style={s.preferenceCard}><Text style={s.eyebrow}>MY HAIR PROFILE</Text><View style={s.preferenceRow}>{[['Type',userProfile?.hairType],['Length',userProfile?.hairLength],['Texture',userProfile?.hairTexture],['Face',userProfile?.faceShape]].map(x => <View style={s.preferenceItem} key={x[0]}><Text style={s.small}>{x[0]}</Text><Text style={s.cardTitle}>{x[1] || 'Not set'}</Text></View>)}</View></View></>}{[
-    ['heart-outline','Saved hairstyles','saved'], ['storefront-outline','Saved salons','saved-salons'], ['notifications-outline','Notifications','notifications'], ['star-outline','My reviews','reviews'], ['shield-checkmark-outline','Privacy & settings','settings']
+    ['heart-outline','Saved hairstyles','saved'], ['storefront-outline','Saved salons','saved-salons'], ['notifications-outline','Notifications','notifications'], ['star-outline','My reviews','reviews'], ['shield-checkmark-outline','Settings','settings']
   ].map(x => <Pressable key={x[1]} onPress={() => x[2] === 'notifications' ? showNotifications('profile') : setScreen(x[2] as Screen)} style={s.menuRow}><View style={s.menuIcon}><Ionicons name={x[0] as keyof typeof Ionicons.glyphMap} size={21} color={C.rose} /></View><Text style={[s.cardTitle, { flex: 1 }]}>{x[1]}</Text>{x[2] === 'notifications' && notificationUnreadCount > 0 && <View style={s.notificationMenuCount}><Text style={s.notificationBadgeText}>{notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}</Text></View>}<Ionicons name="chevron-forward" size={20} color={C.muted} /></Pressable>)}</ScreenFrame>;
 
   const notificationPage = (owner: boolean) => <ScreenFrame><Header title="Notifications" onBack={() => setScreen(owner ? 'owner-dashboard' : notificationReturnScreen)} />{accountLoading ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : accountError ? <Pressable onPress={() => void loadAccountScreen()} style={s.dataState}><Text style={s.cardTitle}>Could not load notifications</Text><Text style={s.small}>{accountError} · Tap to retry</Text></Pressable> : accountItems.length === 0 ? <View style={s.empty}><Ionicons name="notifications-outline" size={40} color="#CDBEC2" /><Text style={s.cardTitle}>No notifications yet</Text><Text style={s.small}>Booking and review updates will appear here.</Text></View> : <View style={s.notificationList}>{accountItems.map(item => { const unread = !Boolean(item.isRead); return <Pressable accessibilityRole="button" accessibilityState={{ selected: unread }} key={item.id} onPress={() => void openNotification(item, owner)} style={({ pressed }) => [s.notificationCard, unread && s.notificationCardUnread, pressed && s.pressed]}><View style={[s.notificationIcon, unread && s.notificationIconUnread]}><Ionicons name={item.destination?.includes('review') ? 'star-outline' : 'calendar-outline'} size={21} color={unread ? C.white : C.rose} /></View><View style={s.salonCardGrow}><View style={s.notificationTitleRow}><Text style={[s.cardTitle, !unread && s.notificationTitleRead]}>{item.title}</Text>{unread && <View style={s.notificationUnreadDot} />}</View>{item.detail && <Text style={s.small}>{item.detail}</Text>}<View style={s.notificationFooter}><Text style={s.notificationDate}>{new Date(item.createdAt).toLocaleString()}</Text>{unread && <Pressable accessibilityRole="button" accessibilityLabel={`Mark ${item.title} as read`} onPress={event => { event.stopPropagation(); readNotification(item); }} style={({ pressed }) => [s.notificationReadButton, pressed && s.pressed]}><Ionicons name="checkmark" size={14} color={C.roseDark} /><Text style={s.notificationReadButtonText}>Mark as read</Text></Pressable>}</View></View>{item.destination && <Ionicons name="chevron-forward" size={19} color={C.muted} />}</Pressable>; })}</View>}</ScreenFrame>;
 
-  const accountPage = (title: string) => <ScreenFrame><Header title={title} onBack={() => setScreen('profile')} />{accountLoading ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : accountError ? <Pressable onPress={() => void loadAccountScreen()} style={s.dataState}><Text style={s.cardTitle}>Could not load {title.toLowerCase()}</Text><Text style={s.small}>{accountError} · Tap to retry</Text></Pressable> : accountItems.length === 0 ? <View style={s.empty}><Ionicons name={title === 'My reviews' ? 'star-outline' : 'heart-outline'} size={40} color="#CDBEC2" /><Text style={s.cardTitle}>Nothing here yet</Text><Text style={s.small}>Your {title.toLowerCase()} will appear here.</Text></View> : accountItems.map(item => <View style={s.listCard} key={item.id}><View style={s.menuIcon}><Ionicons name={title === 'My reviews' ? 'star' : 'heart'} size={20} color={C.rose} /></View><View style={{ flex: 1 }}><Text style={s.cardTitle}>{item.title}</Text>{item.detail && <Text style={s.small}>{item.detail}</Text>}<Text style={s.small}>{new Date(item.createdAt).toLocaleDateString()}</Text></View></View>)}</ScreenFrame>;
+  const openAccountItem = async (item: AccountItem, section: 'saved' | 'saved-salons' | 'reviews') => {
+    if (section === 'saved') {
+      setSelectedAccountItem(item);
+      setScreen('saved-style-detail');
+      return;
+    }
+    if (!item.salonId) return;
+    let salon = salonRecords.find(record => record.id === Number(item.salonId));
+    if (!salon) {
+      try {
+        const latestSalons = await getSalons();
+        setSalonRecords(latestSalons);
+        salon = latestSalons.find(record => record.id === Number(item.salonId));
+      } catch (error) {
+        Alert.alert('Unable to open salon', error instanceof Error ? error.message : 'Please try again.');
+        return;
+      }
+    }
+    if (salon) await openSalon(salon, section);
+  };
 
-  const settingsPage = <ScreenFrame>{authToken && userProfile ? <CustomerSettingsScreen token={authToken} profile={userProfile} privacy={privacySettings} privacyLoading={accountLoading} privacyError={accountError} onBack={() => setScreen('profile')} onSaved={updated => { setUserProfile(updated); setAuthUser(current => current ? { ...current, fullName: updated.fullName, email: updated.email, phone: updated.phone } : current); Alert.alert('Profile updated', 'Your personal information has been saved.'); }} onTogglePrivacy={key => void changePrivacySetting(key)} onReloadPrivacy={() => void loadAccountScreen()} onLogout={() => { setAuthUser(null); setAuthToken(null); setUserProfile(null); setScreen('login'); }} /> : <View style={s.dataState}><ActivityIndicator color={C.rose} /><Text style={s.small}>Loading your profile...</Text></View>}</ScreenFrame>;
+  const accountPage = (title: string, section: 'saved' | 'saved-salons' | 'reviews') => <ScreenFrame><Header title={title} onBack={() => setScreen('profile')} />{accountLoading ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : accountError ? <Pressable onPress={() => void loadAccountScreen()} style={s.dataState}><Text style={s.cardTitle}>Could not load {title.toLowerCase()}</Text><Text style={s.small}>{accountError} · Tap to retry</Text></Pressable> : accountItems.length === 0 ? <View style={s.empty}><Ionicons name={title === 'My reviews' ? 'star-outline' : 'heart-outline'} size={40} color="#CDBEC2" /><Text style={s.cardTitle}>Nothing here yet</Text><Text style={s.small}>Your {title.toLowerCase()} will appear here.</Text></View> : accountItems.map(item => <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.title}`} onPress={() => void openAccountItem(item, section)} style={({ pressed }) => [s.listCard, pressed && s.pressed]} key={item.id}><View style={s.menuIcon}><Ionicons name={title === 'My reviews' ? 'star' : section === 'saved-salons' ? 'storefront' : 'heart'} size={20} color={C.rose} /></View><View style={{ flex: 1 }}><Text style={s.cardTitle}>{item.title}</Text>{item.detail && <Text style={s.small}>{item.detail}</Text>}<Text style={s.small}>{new Date(item.createdAt).toLocaleDateString()}</Text></View><Ionicons name="chevron-forward" size={20} color={C.muted} /></Pressable>)}</ScreenFrame>;
+
+  const savedStyleDetail = <ScreenFrame><Header title="Saved hairstyle" onBack={() => setScreen('saved')} />{selectedAccountItem && <><View style={s.consentHero}><Ionicons name="cut" size={52} color={C.rose} /></View><Text style={s.title}>{selectedAccountItem.title}</Text><Text style={s.body}>This hairstyle is saved to your FaceFit account.</Text><Text style={s.small}>Saved on {new Date(selectedAccountItem.createdAt).toLocaleDateString()}</Text><Button label="Find a salon for this style" onPress={() => setScreen('salons')} icon="storefront-outline" /><Button label="Back to saved hairstyles" onPress={() => setScreen('saved')} secondary /></>}</ScreenFrame>;
+
+  const settingsPage = <ScreenFrame>{authToken && userProfile ? <CustomerSettingsScreen token={authToken} profile={userProfile} onBack={() => setScreen('profile')} onSaved={updated => { setUserProfile(updated); setAuthUser(current => current ? { ...current, fullName: updated.fullName, email: updated.email, phone: updated.phone } : current); Alert.alert('Profile updated', 'Your personal information has been saved.'); }} onLogout={() => { setAuthUser(null); setAuthToken(null); setUserProfile(null); setScreen('login'); }} /> : <View style={s.dataState}><ActivityIndicator color={C.rose} /><Text style={s.small}>Loading your profile...</Text></View>}</ScreenFrame>;
 
   const ownerManagementPage = (page: Exclude<Screen, 'owner-dashboard' | 'owner-notifications'>) => {
     const titles: Partial<Record<Screen, string>> = {
@@ -1118,12 +1154,12 @@ export default function FaceFitPrototype() {
   else if (screen === 'login') content = auth(false); else if (screen === 'signup') content = auth(true);
   else if (screen === 'consent') content = <ScreenFrame><Header title="Before your scan" onBack={() => setScreen('signup')} /><View style={s.consentHero}><Ionicons name="shield-checkmark" size={52} color={C.rose} /></View><Text style={s.title}>Your face data stays yours</Text><Text style={s.body}>We use your photo only to analyze facial proportions and recommend hairstyles. You control whether it is saved or deleted.</Text>{[['camera','Camera access','Needed to capture your guided face scan.'],['location','Location access','Used while the app is open to show nearby salons.'],['lock-closed','Private by design','Images and location are handled securely and never used for ads.'],['trash','Your control','Delete your scan and results from Settings anytime.']].map(x => <View style={s.consentRow} key={x[0]}><View style={s.menuIcon}><Ionicons name={x[0] as keyof typeof Ionicons.glyphMap} size={21} color={C.rose} /></View><View style={{flex:1}}><Text style={s.cardTitle}>{x[1]}</Text><Text style={s.small}>{x[2]}</Text></View></View>)}<Pressable accessibilityRole="checkbox" accessibilityState={{ checked: faceAnalysisConsent }} onPress={() => setFaceAnalysisConsent(value => !value)} style={({ pressed }) => [s.checkRow, pressed && s.pressed]}><Ionicons name={faceAnalysisConsent ? 'checkbox' : 'square-outline'} size={24} color={faceAnalysisConsent ? C.rose : C.muted} /><Text style={[s.small,{flex:1}]}>I understand and consent to face-shape analysis as described in the Privacy Notice.</Text></Pressable><Pressable accessibilityRole="checkbox" accessibilityState={{ checked: locationConsent }} onPress={() => setLocationConsent(value => !value)} style={({ pressed }) => [s.checkRow, s.locationCheckRow, pressed && s.pressed]}><Ionicons name={locationConsent ? 'checkbox' : 'square-outline'} size={24} color={locationConsent ? C.rose : C.muted} /><Text style={[s.small,{flex:1}]}>I consent to location access while using the app so FaceFit can show salons near me.</Text></Pressable><Button label="Agree & continue" disabled={!faceAnalysisConsent || !locationConsent} onPress={() => setScreen('home')} /><Text style={[s.link,s.centerText]}>Read the full Privacy Notice</Text></ScreenFrame>;
   else if (screen === 'home') content = home; else if (screen === 'scan') content = scan; else if (screen === 'processing') content = processing; else if (screen === 'result') content = result; else if (screen === 'recommendations') content = recommendations; else if (screen === 'style-detail') content = styleDetail; else if (screen === 'salons') content = salons; else if (screen === 'salon-detail') content = salonDetail; else if (screen === 'service') content = selection('service'); else if (screen === 'stylist') content = selection('stylist'); else if (screen === 'datetime') content = datetime; else if (screen === 'summary') content = summary; else if (screen === 'success') content = success; else if (screen === 'bookings') content = bookings; else if (screen === 'profile') content = profile;
-  else if (screen === 'saved') content = accountPage('Saved hairstyles'); else if (screen === 'saved-salons') content = accountPage('Saved salons'); else if (screen === 'notifications') content = notificationPage(false); else if (screen === 'reviews') content = accountPage('My reviews'); else if (screen === 'settings') content = settingsPage;
+  else if (screen === 'saved') content = accountPage('Saved hairstyles', 'saved'); else if (screen === 'saved-style-detail') content = savedStyleDetail; else if (screen === 'saved-salons') content = accountPage('Saved salons', 'saved-salons'); else if (screen === 'notifications') content = notificationPage(false); else if (screen === 'reviews') content = accountPage('My reviews', 'reviews'); else if (screen === 'settings') content = settingsPage;
   else if (screen === 'stylist-dashboard') content = rolePage('stylist', 'Stylist Dashboard'); else if (screen === 'stylist-appointments') content = rolePage('stylist', 'Appointments'); else if (screen === 'stylist-detail') content = rolePage('stylist', 'Appointment detail'); else if (screen === 'stylist-status') content = rolePage('stylist', 'Service & availability'); else if (screen === 'stylist-notifications') content = rolePage('stylist', 'Notifications');
   else if (screen === 'owner-dashboard') content = rolePage('owner', 'Owner Dashboard'); else if (screen === 'owner-notifications') content = notificationPage(true); else if (screen.startsWith('owner-')) content = ownerManagementPage(screen as Exclude<Screen, 'owner-dashboard' | 'owner-notifications'>); else content = rolePage('owner', 'Reviews & ratings');
 
-  const showAppNavigation = mainScreens.includes(screen) || ['salons', 'salon-detail', 'service', 'stylist', 'datetime', 'summary', 'success', 'saved', 'saved-salons', 'notifications', 'reviews', 'settings'].includes(screen);
-  return <KeyboardAvoidingView style={s.app} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><StatusBar style={screen === 'scan' ? 'light' : 'dark'} /><View style={[s.appViewport, isDesktopWeb && s.appViewportDesktop]}>{isDesktopWeb && showAppNavigation && <DesktopNavigation screen={screen} go={setScreen} />}<View style={s.contentViewport}>{content}</View></View>{!isDesktopWeb && mainScreens.includes(screen) && !['scan','processing','result','recommendations','style-detail'].includes(screen) && <View style={s.tabShell}><TabBar screen={screen} go={setScreen} /></View>}<Modal visible={mapVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMapVisible(false)}><SafeAreaView style={s.mapModal}><View style={s.mapHeader}><View><Text style={s.mapTitle}>Your location</Text><Text style={s.small}>Explore salons around your current position</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Close map" onPress={() => setMapVisible(false)} style={s.mapClose}><Ionicons name="close" size={24} color={C.ink} /></Pressable></View>{currentLocation && <LocationMap coordinate={currentLocation} salons={mappedSalons} onSelectSalon={salonId => { const salon = salonRecords.find(item => item.id === salonId); if (salon) { setMapVisible(false); void openSalon(salon); } }} />}</SafeAreaView></Modal><OwnerEditorModal editor={ownerEditor} setEditor={setOwnerEditor} saving={ownerEditorSaving} error={ownerEditorError} onSave={() => void saveOwnerEditor()} /><FavoriteToast toast={favoriteToast} onDismiss={dismissFavoriteToast} /></KeyboardAvoidingView>;
+  const showAppNavigation = mainScreens.includes(screen) || ['salons', 'salon-detail', 'service', 'stylist', 'datetime', 'summary', 'success', 'saved', 'saved-style-detail', 'saved-salons', 'notifications', 'reviews', 'settings'].includes(screen);
+  return <KeyboardAvoidingView style={s.app} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><StatusBar style={screen === 'scan' ? 'light' : 'dark'} /><View style={[s.appViewport, isDesktopWeb && s.appViewportDesktop]}>{isDesktopWeb && showAppNavigation && <DesktopNavigation screen={screen} go={setScreen} />}<View style={s.contentViewport}>{content}</View></View>{!isDesktopWeb && (mainScreens.includes(screen) || screen === 'settings') && !['scan','processing','result','recommendations','style-detail'].includes(screen) && <View style={s.tabShell}><TabBar screen={screen} go={setScreen} /></View>}<Modal visible={mapVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMapVisible(false)}><SafeAreaView style={s.mapModal}><View style={s.mapHeader}><View><Text style={s.mapTitle}>Your location</Text><Text style={s.small}>Explore salons around your current position</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Close map" onPress={() => setMapVisible(false)} style={s.mapClose}><Ionicons name="close" size={24} color={C.ink} /></Pressable></View>{currentLocation && <LocationMap coordinate={currentLocation} salons={mappedSalons} onSelectSalon={salonId => { const salon = salonRecords.find(item => item.id === salonId); if (salon) { setMapVisible(false); void openSalon(salon, 'nearby-map'); } }} />}</SafeAreaView></Modal><OwnerEditorModal editor={ownerEditor} setEditor={setOwnerEditor} saving={ownerEditorSaving} error={ownerEditorError} onSave={() => void saveOwnerEditor()} /><FavoriteToast toast={favoriteToast} onDismiss={dismissFavoriteToast} /></KeyboardAvoidingView>;
 }
 
 const s = StyleSheet.create({
@@ -1144,7 +1180,7 @@ const s = StyleSheet.create({
   tabShell:{position:'absolute',bottom:0,left:0,right:0,alignItems:'center'},tabBar:{width:'100%',maxWidth:430,height:82,paddingBottom:15,backgroundColor:C.white,borderTopWidth:1,borderTopColor:C.line,flexDirection:'row',shadowColor:'#000',shadowOpacity:.08,shadowRadius:16,elevation:12},tabBarWeb:{maxWidth:'100%'},tabItem:{flex:1,alignItems:'center',justifyContent:'center',gap:3},tabLabel:{fontSize:11,fontWeight:'600',color:C.muted},tabActive:{color:C.rose,fontWeight:'800'},
   centerPage:{flex:1,padding:24,alignItems:'center',justifyContent:'center'},processIcon:{width:105,height:105,borderRadius:53,backgroundColor:C.blush,alignItems:'center',justifyContent:'center',marginBottom:28},steps:{width:'100%',padding:20,borderRadius:20,backgroundColor:C.white,marginTop:20},step:{flexDirection:'row',gap:12,alignItems:'center',marginVertical:8},stepDot:{width:21,height:21,borderRadius:11,borderWidth:2,borderColor:'#D8C9CD',alignItems:'center',justifyContent:'center'},stepDone:{backgroundColor:C.green,borderColor:C.green},
   resultVisual:{height:285,borderRadius:24,overflow:'hidden',marginBottom:12,position:'relative'},resultImage:{width:'100%',height:'100%',resizeMode:'cover'},outlineOval:{position:'absolute',width:150,height:210,borderRadius:75,borderWidth:2,borderColor:C.white,alignSelf:'center',top:34},confidence:{position:'absolute',right:12,bottom:12,backgroundColor:C.white,borderRadius:12,padding:9},confidenceText:{fontSize:12,fontWeight:'800',color:C.green},chipRow:{flexDirection:'row',flexWrap:'wrap',gap:8,marginBottom:18},chip:{backgroundColor:C.blush,borderRadius:99,paddingHorizontal:12,paddingVertical:8},chipText:{fontSize:12,fontWeight:'700',color:C.roseDark},
-  chatBox:{height:54,borderRadius:18,backgroundColor:C.white,borderWidth:1,borderColor:'#E2C8CF',flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:13,marginBottom:20},chatInput:{flex:1,fontSize:13,color:C.ink,outlineStyle:'none' as never},recCard:{backgroundColor:C.white,borderRadius:20,overflow:'hidden',marginBottom:18,borderWidth:1,borderColor:C.line},recBody:{padding:14},matchBadge:{position:'absolute',top:12,right:12,backgroundColor:C.white,borderRadius:10,padding:8},matchText:{fontSize:12,fontWeight:'800',color:C.rose},detailTitle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:20},scoreCircle:{width:54,height:54,borderRadius:27,backgroundColor:C.blush,alignItems:'center',justifyContent:'center'},scoreText:{fontSize:18,fontWeight:'900',color:C.rose},
+  chatBox:{height:54,borderRadius:18,backgroundColor:C.white,borderWidth:1,borderColor:'#E2C8CF',flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:13,marginBottom:20},chatInput:{flex:1,fontSize:13,color:C.ink,outlineStyle:'none' as never},matchSectionTitle:{fontSize:20,fontWeight:'900',color:C.ink,marginTop:8,marginBottom:3},matchSectionCopy:{fontSize:13,lineHeight:19,color:C.muted,marginBottom:12},recCard:{backgroundColor:C.white,borderRadius:20,overflow:'hidden',marginBottom:14,borderWidth:1,borderColor:C.line},recBody:{padding:14,paddingTop:50},matchBadge:{position:'absolute',top:12,left:14,backgroundColor:C.blush,borderRadius:10,paddingHorizontal:9,paddingVertical:7,zIndex:1},matchText:{fontSize:12,fontWeight:'800',color:C.rose},detailTitle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:8,marginBottom:12,gap:16},scoreCircle:{width:54,height:54,borderRadius:27,backgroundColor:C.blush,alignItems:'center',justifyContent:'center'},scoreText:{fontSize:18,fontWeight:'900',color:C.rose},
   salonSearch:{height:52,borderRadius:17,backgroundColor:C.white,borderWidth:1,borderColor:C.line,flexDirection:'row',alignItems:'center',paddingHorizontal:15,gap:10,marginBottom:12},salonSearchInput:{flex:1,height:'100%',fontSize:14,color:C.ink,outlineStyle:'none' as never},searchClear:{width:30,height:30,alignItems:'center',justifyContent:'center'},clearSearchButton:{minHeight:40,paddingHorizontal:14,alignItems:'center',justifyContent:'center'},segment:{height:48,borderRadius:15,backgroundColor:'#EEE6E7',padding:4,flexDirection:'row',marginBottom:17},segmentActive:{flex:1,borderRadius:12,backgroundColor:C.white,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:6},segmentItem:{flex:1,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:6},segmentText:{fontSize:13,fontWeight:'800',color:C.rose},mapMock:{height:150,borderRadius:22,backgroundColor:'#EFE6E0',alignItems:'center',justifyContent:'center',marginBottom:14,overflow:'hidden'},pin:{position:'absolute',top:25,right:80,width:38,height:38,borderRadius:19,backgroundColor:C.rose,alignItems:'center',justifyContent:'center'},listCard:{minHeight:82,borderRadius:18,backgroundColor:C.white,borderWidth:1,borderColor:C.line,padding:13,flexDirection:'row',alignItems:'center',gap:12,marginBottom:12},listFavorite:{width:40,height:40,borderRadius:20,backgroundColor:C.pale,borderWidth:1,borderColor:C.line,alignItems:'center',justifyContent:'center'},salonSquare:{width:58,height:58,borderRadius:16,backgroundColor:C.blush,alignItems:'center',justifyContent:'center',overflow:'hidden'},salonSquareImage:{width:'100%',height:'100%',resizeMode:'cover'},
   mapModal:{flex:1,backgroundColor:C.pale},mapHeader:{minHeight:82,paddingHorizontal:18,paddingVertical:12,backgroundColor:C.white,borderBottomWidth:1,borderBottomColor:C.line,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},mapTitle:{fontSize:19,fontWeight:'800',color:C.ink,marginBottom:2},mapClose:{width:42,height:42,borderRadius:21,alignItems:'center',justifyContent:'center',backgroundColor:C.pale,borderWidth:1,borderColor:C.line},
   mapNotice:{marginTop:12,padding:14,borderRadius:15,backgroundColor:C.blush,flexDirection:'row',alignItems:'center',gap:10},mapAttribution:{fontSize:10,color:C.muted,textAlign:'right',marginTop:7},

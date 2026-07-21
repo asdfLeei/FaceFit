@@ -99,6 +99,15 @@ export type Booking = {
 };
 export type AccountItem = { id: number; title: string; detail?: string; destination?: string | null; referenceId?: number | null; salonId?: number | null; isRead?: boolean; createdAt: string };
 export type PrivacySettings = { notificationsEnabled: boolean; saveScanHistory: boolean };
+export type FaceAnalysis = {
+  faceShape: 'oval' | 'round' | 'square' | 'heart' | 'oblong' | 'diamond';
+  stylePreference: 'men';
+  confidence: number;
+  imageSize: { width: number; height: number };
+  landmarks: { x: number; y: number; z: number }[];
+  measurements: { lengthToWidth: number; jawToCheek: number; foreheadToCheek: number };
+  recommendations: { name: string; score: number; reason: string; audience: 'women' | 'men' }[];
+};
 export type OwnerDashboard = {
   id: number;
   name: string;
@@ -242,6 +251,17 @@ export async function updateProfile(token: string, input: { fullName: string; em
   const result = await response.json().catch(() => null);
   if (!response.ok) throw new Error(result?.error || `API request failed (${response.status})`);
   return (result as { data: UserProfile }).data;
+}
+
+export async function analyzeFace(token: string, imageData: string) {
+  const response = await fetchApi('/api/face-analysis', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageData }),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error || `Face analysis failed (${response.status})`);
+  return (result as { data: FaceAnalysis }).data;
 }
 
 export async function getOwnerDashboard(token: string) {

@@ -116,6 +116,48 @@ function optionalText(value, maxLength) {
   return String(value || '').trim().slice(0, maxLength) || null;
 }
 
+app.post('/api/face-analysis', authenticate, async (request, response, next) => {
+  const { imageData } = request.body;
+  if (typeof imageData !== 'string' || imageData.length > 5.5 * 1024 * 1024) {
+    return response.status(400).json({ error: 'A face photo smaller than 4 MB is required.' });
+  }
+  const analysisUrl = (process.env.FACE_ANALYSIS_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+  try {
+    const [profiles] = await pool.execute(
+      'SELECT hair_type AS hairType, hair_length AS hairLength, hair_texture AS hairTexture FROM customer_profiles WHERE user_id = ? LIMIT 1',
+      [request.user.sub],
+    );
+    const aiResponse = await fetch(`${analysisUrl}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageData, stylePreference: 'men', ...(profiles[0] || {}) }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const analysis = await aiResponse.json().catch(() => null);
+    if (!aiResponse.ok) {
+      return response.status(aiResponse.status === 422 ? 422 : 502).json({
+        error: analysis?.detail || 'Face analysis could not process this photo.',
+      });
+    }
+    const [privacyRows] = await pool.execute(
+      'SELECT save_scan_history AS saveScanHistory FROM privacy_settings WHERE user_id = ? LIMIT 1',
+      [request.user.sub],
+    );
+    if (privacyRows[0]?.saveScanHistory !== 0) {
+      await pool.execute(
+        'INSERT INTO face_analyses (user_id, face_shape, confidence) VALUES (?, ?, ?)',
+        [request.user.sub, analysis.faceShape, Number(analysis.confidence) * 100],
+      );
+    }
+    return response.json({ data: analysis });
+  } catch (error) {
+    if (error.name === 'TimeoutError' || error.cause?.code === 'ECONNREFUSED') {
+      return response.status(503).json({ error: 'The face-analysis service is unavailable. Start the Python service and try again.' });
+    }
+    return next(error);
+  }
+});
+
 async function attachReviewReplies(reviews, salonId) {
   const [replies] = await pool.execute(
     `SELECT rr.id, rr.review_id AS reviewId, rr.message, rr.image_path AS imageUrl,
@@ -729,14 +771,14 @@ app.patch('/api/owner/bookings/:bookingId', authenticate, async (request, respon
 app.get('/api/account/:section', authenticate, async (request, response, next) => {
   const queries = {
     saved: `SELECT id, hairstyle_name AS title, saved_at AS createdAt FROM saved_hairstyles WHERE user_id = ? ORDER BY saved_at DESC`,
-    salons: `SELECT s.id, s.name AS title, s.address AS detail, fs.created_at AS createdAt FROM favorite_salons fs JOIN salons s ON s.id = fs.salon_id WHERE fs.user_id = ? ORDER BY fs.created_at DESC`,
+    salons: `SELECT fs.id, s.id AS salonId, s.name AS title, s.address AS detail, fs.created_at AS createdAt FROM favorite_salons fs JOIN salons s ON s.id = fs.salon_id WHERE fs.user_id = ? ORDER BY fs.created_at DESC`,
     notifications: `SELECT n.id, n.title, n.message AS detail, n.destination, n.reference_id AS referenceId,
                            CASE WHEN n.destination = 'reviews' THEN r.salon_id ELSE NULL END AS salonId,
                            n.is_read AS isRead, n.created_at AS createdAt
                     FROM notifications n
                     LEFT JOIN reviews r ON n.destination = 'reviews' AND r.id = n.reference_id
                     WHERE n.user_id = ? ORDER BY n.created_at DESC, n.id DESC`,
-    reviews: `SELECT r.id, s.name AS title, CONCAT(r.rating, ' / 5', IF(r.comment IS NULL OR r.comment = '', '', CONCAT(' · ', r.comment))) AS detail, r.created_at AS createdAt FROM reviews r JOIN salons s ON s.id = r.salon_id WHERE r.user_id = ? ORDER BY r.created_at DESC`,
+    reviews: `SELECT r.id, r.salon_id AS salonId, s.name AS title, CONCAT(r.rating, ' / 5', IF(r.comment IS NULL OR r.comment = '', '', CONCAT(' · ', r.comment))) AS detail, r.created_at AS createdAt FROM reviews r JOIN salons s ON s.id = r.salon_id WHERE r.user_id = ? ORDER BY r.created_at DESC`,
   };
   const query = queries[request.params.section];
   if (!query) return response.status(404).json({ error: 'Account section not found.' });

@@ -39,6 +39,10 @@ server/uploads/
 # typescript
 *.tsbuildinfo
 
+# Python face-analysis service
+face-analysis-service/.venv/
+face-analysis-service/__pycache__/
+
 app-example
 
 # generated native folders

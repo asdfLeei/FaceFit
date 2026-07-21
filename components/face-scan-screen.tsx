@@ -24,7 +24,7 @@ const colors = {
 
 type FaceScanScreenProps = {
   onBack: () => void;
-  onCaptured: (uri: string) => void;
+  onCaptured: (photo: { uri: string; imageData: string }) => void;
 };
 
 export function FaceScanScreen({ onBack, onCaptured }: FaceScanScreenProps) {
@@ -40,9 +40,15 @@ export function FaceScanScreen({ onBack, onCaptured }: FaceScanScreenProps) {
       allowsEditing: true,
       aspect: [3, 4],
       quality: 0.8,
+      base64: true,
     });
 
-    if (!result.canceled) onCaptured(result.assets[0].uri);
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      const mimeType = ['image/jpeg', 'image/png', 'image/webp'].includes(asset.mimeType || '') ? asset.mimeType : 'image/jpeg';
+      if (!asset.base64) return Alert.alert('Photo could not be read', 'Please choose another JPG, PNG, or WebP photo.');
+      onCaptured({ uri: asset.uri, imageData: `data:${mimeType};base64,${asset.base64}` });
+    }
   };
 
   const takePhoto = async () => {
@@ -50,8 +56,13 @@ export function FaceScanScreen({ onBack, onCaptured }: FaceScanScreenProps) {
 
     setCapturing(true);
     try {
-      const photo = await camera.current.takePictureAsync({ quality: 0.8 });
-      if (photo?.uri) onCaptured(photo.uri);
+      const photo = await camera.current.takePictureAsync({ quality: 0.65, base64: true });
+      if (photo?.uri) {
+        const encoded = photo.base64 || (photo.uri.startsWith('data:image/') ? photo.uri : null);
+        if (!encoded) throw new Error('The camera did not return image data.');
+        const imageData = encoded.startsWith('data:image/') ? encoded : `data:image/jpeg;base64,${encoded}`;
+        onCaptured({ uri: photo.uri, imageData });
+      }
     } catch {
       Alert.alert('Photo not captured', 'Please hold still and try again.');
     } finally {
@@ -90,6 +101,7 @@ export function FaceScanScreen({ onBack, onCaptured }: FaceScanScreenProps) {
               active
               animateShutter
               facing={facing}
+              autofocus="on"
               mirror={facing === 'front'}
               mode="picture"
               onCameraReady={() => setCameraReady(true)}
@@ -109,7 +121,7 @@ export function FaceScanScreen({ onBack, onCaptured }: FaceScanScreenProps) {
                 <View style={[styles.guideCorner, styles.cornerBottomLeft]} />
                 <View style={[styles.guideCorner, styles.cornerBottomRight]} />
               </View>
-              <Text style={styles.tip}>Face forward in soft, even light</Text>
+              <View style={styles.tipPill}><Ionicons name="sunny-outline" size={15} color={colors.white} /><Text style={styles.tip}>Face forward · remove glasses · use even light</Text></View>
             </View>
 
             <View style={styles.controls}>
@@ -170,19 +182,20 @@ const styles = StyleSheet.create({
   headerSubtitle: { color: colors.muted, fontSize: 11, marginTop: 2 },
   secureIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   preview: { flex: 1, overflow: 'hidden', backgroundColor: '#292326' },
-  previewShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(16,12,14,0.08)' },
+  previewShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(16,12,14,0.14)' },
   guideArea: { ...StyleSheet.absoluteFillObject, paddingTop: 28, paddingBottom: 148, alignItems: 'center', justifyContent: 'space-between' },
   statusPill: { height: 34, paddingHorizontal: 13, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(20,16,18,0.72)' },
   statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#D4A746' },
   statusDotReady: { backgroundColor: '#64B68B' },
   statusText: { color: colors.white, fontSize: 12, fontWeight: '700' },
-  faceGuide: { width: 230, height: 306, maxHeight: '68%', borderRadius: 115, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' },
+  faceGuide: { width: 230, height: 306, maxHeight: '68%', borderRadius: 115, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', backgroundColor: 'rgba(255,255,255,0.025)', overflow: 'hidden' },
   guideCorner: cornerBase,
   cornerTopLeft: { top: 15, left: 15, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 14 },
   cornerTopRight: { top: 15, right: 15, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 14 },
   cornerBottomLeft: { bottom: 15, left: 15, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 14 },
   cornerBottomRight: { right: 15, bottom: 15, borderRightWidth: 3, borderBottomWidth: 3, borderBottomRightRadius: 14 },
-  tip: { color: colors.white, fontSize: 12, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 5 },
+  tipPill: { minHeight: 34, paddingHorizontal: 12, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(20,16,18,0.7)' },
+  tip: { color: colors.white, fontSize: 11, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 5 },
   controls: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 132, paddingHorizontal: 28, paddingBottom: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(20,16,18,0.88)' },
   toolButton: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center', gap: 5 },
   toolLabel: { color: colors.white, fontSize: 11, fontWeight: '600' },
