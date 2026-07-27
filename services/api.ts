@@ -433,8 +433,9 @@ export async function updatePrivacySettings(token: string, settings: PrivacySett
   return (result as { data: PrivacySettings }).data;
 }
 
-export async function getSalons() {
-  const response = await apiRequest<{ data: Salon[] }>('/api/salons');
+export async function getSalons(hairstyle?: string) {
+  const query = hairstyle ? `?hairstyle=${encodeURIComponent(hairstyle)}` : '';
+  const response = await apiRequest<{ data: Salon[] }>(`/api/salons${query}`);
   return response.data;
 }
 

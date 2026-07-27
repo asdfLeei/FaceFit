@@ -77,6 +77,15 @@ CREATE TABLE IF NOT EXISTS services (
   INDEX idx_services_salon_active (salon_id, is_active)
 );
 
+CREATE TABLE IF NOT EXISTS salon_hairstyles (
+  salon_id BIGINT UNSIGNED NOT NULL,
+  hairstyle_name VARCHAR(120) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (salon_id, hairstyle_name),
+  CONSTRAINT fk_salon_hairstyles_salon FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE,
+  INDEX idx_salon_hairstyles_name (hairstyle_name)
+);
+
 CREATE TABLE IF NOT EXISTS bookings (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NOT NULL,
@@ -260,15 +269,130 @@ WHERE source = 'Public business listing' AND external_id = 'queen-eva-salon';
 INSERT INTO services (salon_id, name, description, price, duration_minutes)
 SELECT s.id, 'Classic Haircut', 'FaceFit starter service — salon owners can edit this offering.', 350.00, 60
 FROM salons s WHERE NOT EXISTS (
-  SELECT 1 FROM services sv WHERE sv.salon_id = s.id AND sv.name = 'Classic Haircut'
+  SELECT 1 FROM services sv
+  WHERE sv.salon_id = s.id AND sv.name = 'Classic Haircut'
+    AND sv.is_active = TRUE AND sv.deleted_at IS NULL
 );
 INSERT INTO services (salon_id, name, description, price, duration_minutes)
 SELECT s.id, 'Hair Color', 'FaceFit starter service — final price may vary after consultation.', 1200.00, 120
 FROM salons s WHERE NOT EXISTS (
-  SELECT 1 FROM services sv WHERE sv.salon_id = s.id AND sv.name = 'Hair Color'
+  SELECT 1 FROM services sv
+  WHERE sv.salon_id = s.id AND sv.name = 'Hair Color'
+    AND sv.is_active = TRUE AND sv.deleted_at IS NULL
 );
 INSERT INTO services (salon_id, name, description, price, duration_minutes)
 SELECT s.id, 'Hair Treatment', 'FaceFit starter service — final treatment depends on hair condition.', 800.00, 90
 FROM salons s WHERE NOT EXISTS (
-  SELECT 1 FROM services sv WHERE sv.salon_id = s.id AND sv.name = 'Hair Treatment'
+  SELECT 1 FROM services sv
+  WHERE sv.salon_id = s.id AND sv.name = 'Hair Treatment'
+    AND sv.is_active = TRUE AND sv.deleted_at IS NULL
 );
+
+-- Expanded starter menu for salons that have not published these offerings yet.
+-- Owners can edit or remove each item from salon management.
+INSERT INTO services (salon_id, name, description, price, duration_minutes)
+SELECT s.id, menu.name, menu.description, menu.price, menu.duration_minutes
+FROM salons s
+CROSS JOIN (
+  SELECT 'Premium Style Haircut' AS name, 'Consultation, precision haircut, and basic styling. Starter price; final price may vary by hair length.' AS description, 550.00 AS price, 75 AS duration_minutes
+  UNION ALL SELECT 'Kids Haircut', 'Haircut for children aged 12 and below.', 250.00, 45
+  UNION ALL SELECT 'Shampoo & Blow Dry', 'Hair wash followed by a smooth or volumized blow-dry finish.', 300.00, 45
+  UNION ALL SELECT 'Event Hair Styling', 'Styled finish for parties, graduations, and special occasions.', 700.00, 75
+  UNION ALL SELECT 'Highlights', 'Partial highlights with consultation and finishing style.', 1500.00, 150
+  UNION ALL SELECT 'Keratin Treatment', 'Smoothing treatment; final price depends on hair length and condition.', 1800.00, 150
+  UNION ALL SELECT 'Hair Spa', 'Deep-conditioning hair and scalp care treatment.', 650.00, 75
+  UNION ALL SELECT 'Hair Rebonding', 'Straightening service; final price depends on hair length and condition.', 2500.00, 240
+  UNION ALL SELECT 'Hair Perm', 'Texture and curl service with consultation.', 1800.00, 180
+  UNION ALL SELECT 'Beard Trim & Styling', 'Beard shaping, trimming, and finishing.', 200.00, 30
+  UNION ALL SELECT 'Style Consultation', 'Discuss your FaceFit recommendation with a salon professional.', 200.00, 30
+) AS menu
+WHERE NOT EXISTS (
+  SELECT 1 FROM services sv
+  WHERE sv.salon_id = s.id AND sv.name = menu.name
+    AND sv.is_active = TRUE AND sv.deleted_at IS NULL
+);
+
+-- Starter hairstyle availability. Each style is assigned to a focused subset
+-- of salons so customers only see locations that offer their selected look.
+INSERT IGNORE INTO salon_hairstyles (salon_id, hairstyle_name)
+SELECT s.id, styles.name
+FROM salons s
+CROSS JOIN (
+  SELECT 0 AS style_index, 'Textured Crop' AS name
+  UNION ALL SELECT 1, 'Classic Side Part'
+  UNION ALL SELECT 2, 'Modern Quiff'
+  UNION ALL SELECT 3, 'Short Pompadour'
+  UNION ALL SELECT 4, 'High Fade with Volume'
+  UNION ALL SELECT 5, 'Angular Fringe'
+  UNION ALL SELECT 6, 'Textured Quiff'
+  UNION ALL SELECT 7, 'Side-Part Undercut'
+  UNION ALL SELECT 8, 'Textured Crew Cut'
+  UNION ALL SELECT 9, 'Short Quiff'
+  UNION ALL SELECT 10, 'Low Fade Crop'
+  UNION ALL SELECT 11, 'Textured Fringe'
+  UNION ALL SELECT 12, 'Medium Side Sweep'
+  UNION ALL SELECT 13, 'Low Fade Quiff'
+  UNION ALL SELECT 14, 'Layered Bro Flow'
+  UNION ALL SELECT 15, 'Side-Swept Crop'
+  UNION ALL SELECT 16, 'Caesar Cut'
+  UNION ALL SELECT 17, 'Medium Textured Fringe'
+  UNION ALL SELECT 18, 'Classic Taper'
+  UNION ALL SELECT 19, 'Side-Part Taper'
+  UNION ALL SELECT 20, 'Messy Medium Crop'
+  UNION ALL SELECT 21, 'Bro Flow'
+) AS styles
+WHERE MOD(s.id + styles.style_index, 3) = 0;
+
+-- Non-login demo staff profiles for customer-facing salon previews.
+-- The random password hash has no known login password.
+INSERT IGNORE INTO users (full_name, email, password_hash, phone, role)
+SELECT 'Alex Reyes', CONCAT('alex.salon', s.id, '@facefit.local'),
+       '$2b$12$V62YlpeyhT3cdp1GP4UJYem0s6IHeI3daKsXrc.Tqe.CcR82d1/2S',
+       NULL, 'stylist'
+FROM salons s;
+INSERT IGNORE INTO users (full_name, email, password_hash, phone, role)
+SELECT 'Mika Santos', CONCAT('mika.salon', s.id, '@facefit.local'),
+       '$2b$12$V62YlpeyhT3cdp1GP4UJYem0s6IHeI3daKsXrc.Tqe.CcR82d1/2S',
+       NULL, 'stylist'
+FROM salons s;
+INSERT INTO stylists (user_id, salon_id, specialties, is_available)
+SELECT u.id, s.id, 'Precision cuts, fades, and FaceFit recommendations', TRUE
+FROM salons s
+JOIN users u ON u.email = CONCAT('alex.salon', s.id, '@facefit.local')
+WHERE NOT EXISTS (SELECT 1 FROM stylists st WHERE st.user_id = u.id);
+INSERT INTO stylists (user_id, salon_id, specialties, is_available)
+SELECT u.id, s.id, 'Color, treatments, styling, and consultations', TRUE
+FROM salons s
+JOIN users u ON u.email = CONCAT('mika.salon', s.id, '@facefit.local')
+WHERE NOT EXISTS (SELECT 1 FROM stylists st WHERE st.user_id = u.id);
+
+-- Non-login demo customers used only to provide representative salon reviews.
+INSERT IGNORE INTO users (full_name, email, password_hash, phone, role) VALUES
+  ('Angela Cruz', 'demo.review.angela@facefit.local', '$2b$12$V62YlpeyhT3cdp1GP4UJYem0s6IHeI3daKsXrc.Tqe.CcR82d1/2S', NULL, 'customer'),
+  ('Carlo Mendoza', 'demo.review.carlo@facefit.local', '$2b$12$V62YlpeyhT3cdp1GP4UJYem0s6IHeI3daKsXrc.Tqe.CcR82d1/2S', NULL, 'customer'),
+  ('Mae Villanueva', 'demo.review.mae@facefit.local', '$2b$12$V62YlpeyhT3cdp1GP4UJYem0s6IHeI3daKsXrc.Tqe.CcR82d1/2S', NULL, 'customer');
+
+INSERT INTO reviews (user_id, salon_id, rating, comment)
+SELECT u.id, s.id, 5, 'Friendly staff and a clean, comfortable salon. The consultation was clear and helpful.'
+FROM salons s JOIN users u ON u.email = 'demo.review.angela@facefit.local'
+WHERE NOT EXISTS (
+  SELECT 1 FROM reviews r WHERE r.user_id = u.id AND r.salon_id = s.id
+    AND r.comment = 'Friendly staff and a clean, comfortable salon. The consultation was clear and helpful.'
+);
+INSERT INTO reviews (user_id, salon_id, rating, comment)
+SELECT u.id, s.id, 4, 'The service started on time and the stylist listened carefully to the look I wanted.'
+FROM salons s JOIN users u ON u.email = 'demo.review.carlo@facefit.local'
+WHERE NOT EXISTS (
+  SELECT 1 FROM reviews r WHERE r.user_id = u.id AND r.salon_id = s.id
+    AND r.comment = 'The service started on time and the stylist listened carefully to the look I wanted.'
+);
+INSERT INTO reviews (user_id, salon_id, rating, comment)
+SELECT u.id, s.id, 5, 'Great result and professional service. I would book here again for my next haircut.'
+FROM salons s JOIN users u ON u.email = 'demo.review.mae@facefit.local'
+WHERE NOT EXISTS (
+  SELECT 1 FROM reviews r WHERE r.user_id = u.id AND r.salon_id = s.id
+    AND r.comment = 'Great result and professional service. I would book here again for my next haircut.'
+);
+
+UPDATE salons s
+SET s.rating = (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.salon_id = s.id);

@@ -361,6 +361,7 @@ export default function FaceFitPrototype() {
   const [faceAnalysis, setFaceAnalysis] = useState<FaceAnalysis | null>(null);
   const [selectedRecommendation, setSelectedRecommendation] = useState<FaceAnalysis['recommendations'][number] | null>(null);
   const [salonRecords, setSalonRecords] = useState<Salon[]>([]);
+  const [styleSalonRecords, setStyleSalonRecords] = useState<Salon[] | null>(null);
   const [selectedSalon, setSelectedSalon] = useState<Salon | null>(null);
   const [salonServices, setSalonServices] = useState<SalonService[]>([]);
   const [salonStaff, setSalonStaff] = useState<SalonStaff[]>([]);
@@ -449,6 +450,19 @@ export default function FaceFitPrototype() {
       setSalonsLoading(false);
     }
   }, []);
+  const findSalonsForStyle = async (hairstyle: string) => {
+    setScreen('salons');
+    setSalonsLoading(true);
+    setSalonsError(null);
+    try {
+      setStyleSalonRecords(await getSalons(hairstyle));
+    } catch (error) {
+      setStyleSalonRecords([]);
+      setSalonsError(error instanceof Error ? error.message : 'Unable to find salons for this hairstyle.');
+    } finally {
+      setSalonsLoading(false);
+    }
+  };
   useEffect(() => { void loadSalons(); }, [loadSalons]);
   const loadBookings = useCallback(async () => {
     if (!authToken) return;
@@ -771,6 +785,7 @@ export default function FaceFitPrototype() {
     setSalonPortfolioImages([]);
     setSalonReviews([]);
     setSalonReviewSummary({ count: 0, average: 0 });
+    setSelectedService(null);
     setSelectedStylist(null);
     setReviewRating(0);
     setReviewComment('');
@@ -789,7 +804,15 @@ export default function FaceFitPrototype() {
       authToken ? getMySalonReviews(authToken, salon.id) : Promise.resolve([]),
     ]);
     if (requestId !== salonLoadRequestRef.current) return;
-    if (servicesResult.status === 'fulfilled') setSalonServices(servicesResult.value);
+    if (servicesResult.status === 'fulfilled') {
+      setSalonServices(servicesResult.value);
+      if (selectedRecommendation) {
+        const recommendedService = servicesResult.value.find(service => service.name === 'Premium Style Haircut')
+          || servicesResult.value.find(service => /haircut|hair cut|style|cut/i.test(service.name))
+          || servicesResult.value[0];
+        setSelectedService(recommendedService || null);
+      }
+    }
     if (staffResult.status === 'fulfilled') setSalonStaff(staffResult.value);
     if (portfolioResult.status === 'fulfilled') setSalonPortfolioImages(portfolioResult.value);
     if (reviewsResult.status === 'fulfilled') {
@@ -876,7 +899,12 @@ export default function FaceFitPrototype() {
     setBookingLoading(true);
     setBookingError(null);
     try {
-      await createBooking(authToken, { serviceId: selectedService.id, stylistId: selectedStylist?.id, appointmentAt: `${selectedDate} ${selectedTime}:00` });
+      await createBooking(authToken, {
+        serviceId: selectedService.id,
+        stylistId: selectedStylist?.id,
+        appointmentAt: `${selectedDate} ${selectedTime}:00`,
+        notes: selectedRecommendation ? `FaceFit suggested hairstyle: ${selectedRecommendation.name}` : undefined,
+      });
       await loadBookings();
       setScreen('success');
     } catch (error) {
@@ -913,9 +941,14 @@ export default function FaceFitPrototype() {
     setUploaded(uri);
     setFaceAnalysis(null);
     setSelectedRecommendation(null);
+    setStyleSalonRecords(null);
     setScreen('processing');
     try {
-      setFaceAnalysis(await analyzeFace(authToken, imageData));
+      const [analysis] = await Promise.all([
+        analyzeFace(authToken, imageData),
+        new Promise(resolve => setTimeout(resolve, 1800)),
+      ]);
+      setFaceAnalysis(analysis);
       setScreen('result');
     } catch (error) {
       Alert.alert('Face analysis failed', error instanceof Error ? error.message : 'Please try another photo.');
@@ -987,12 +1020,13 @@ export default function FaceFitPrototype() {
   const recommendationCard = (item: FaceAnalysis['recommendations'][number]) => <Pressable onPress={() => { setSelectedRecommendation(item); setScreen('style-detail'); }} style={s.recCard} key={`${item.audience}-${item.name}`}><View style={s.matchBadge}><Text style={s.matchText}>{item.score}% match</Text></View><View style={s.recBody}><View style={s.sectionHead}><Text style={s.cardTitle}>{item.name}</Text><Ionicons name="chevron-forward" size={20} color={C.rose} /></View><Text style={s.small}>{item.reason}</Text></View></Pressable>;
   const recommendations = <ScreenFrame><Header title="Men's top matches" onBack={() => setScreen('result')} action="heart-outline" /><Text style={s.body}>Men&apos;s hairstyles ranked for your {faceAnalysis?.faceShape || 'detected'} face shape and facial proportions.</Text><View style={s.chatBox}><Ionicons name="sparkles" size={19} color={C.rose} /><TextInput style={s.chatInput} placeholder="Refine: shorter, curly, low-maintenance…" placeholderTextColor="#9A8D91" /><Ionicons name="arrow-up-circle" size={27} color={C.rose} /></View><Text style={s.matchSectionTitle}>Recommended for you</Text><Text style={s.matchSectionCopy}>Shapes and finishes selected for your facial structure.</Text>{menMatches.map(recommendationCard)}</ScreenFrame>;
 
-  const styleDetail = selectedRecommendation ? <ScreenFrame><Header title="Style details" onBack={() => setScreen('recommendations')} action="heart-outline" /><View style={s.detailTitle}><View style={{flex:1}}><Text style={s.eyebrow}>{selectedRecommendation.audience === 'men' ? "MEN'S STYLE" : "WOMEN'S STYLE"}</Text><Text style={s.title}>{selectedRecommendation.name}</Text><Text style={s.matchText}>{selectedRecommendation.score}% match for you</Text></View><View style={s.scoreCircle}><Text style={s.scoreText}>{selectedRecommendation.score}</Text></View></View><Text style={s.sectionTitle}>Why it suits you</Text><Text style={s.body}>{selectedRecommendation.reason}</Text><View style={s.chipRow}><View style={s.chip}><Text style={s.chipText}>{faceAnalysis?.faceShape} face</Text></View><View style={s.chip}><Text style={s.chipText}>Landmark matched</Text></View></View><Button label="Save hairstyle" disabled={!authToken} onPress={() => { if (authToken) void saveHairstyle(authToken, selectedRecommendation.name).then(() => Alert.alert('Saved', `${selectedRecommendation.name} was added to your saved hairstyles.`)).catch(error => Alert.alert('Unable to save', error.message)); }} icon="heart" /><Button label="Find a salon for this style" onPress={() => setScreen('salons')} icon="location" /></ScreenFrame> : recommendations;
+  const styleDetail = selectedRecommendation ? <ScreenFrame><Header title="Style details" onBack={() => setScreen('recommendations')} action="heart-outline" /><View style={s.detailTitle}><View style={{flex:1}}><Text style={s.eyebrow}>{selectedRecommendation.audience === 'men' ? "MEN'S STYLE" : "WOMEN'S STYLE"}</Text><Text style={s.title}>{selectedRecommendation.name}</Text><Text style={s.matchText}>{selectedRecommendation.score}% match for you</Text></View><View style={s.scoreCircle}><Text style={s.scoreText}>{selectedRecommendation.score}</Text></View></View><Text style={s.sectionTitle}>Why it suits you</Text><Text style={s.body}>{selectedRecommendation.reason}</Text><View style={s.chipRow}><View style={s.chip}><Text style={s.chipText}>{faceAnalysis?.faceShape} face</Text></View><View style={s.chip}><Text style={s.chipText}>Landmark matched</Text></View></View><Button label="Save hairstyle" disabled={!authToken} onPress={() => { if (authToken) void saveHairstyle(authToken, selectedRecommendation.name).then(() => Alert.alert('Saved', `${selectedRecommendation.name} was added to your saved hairstyles.`)).catch(error => Alert.alert('Unable to save', error.message)); }} icon="heart" /><Button label="Find a salon for this style" onPress={() => void findSalonsForStyle(selectedRecommendation.name)} icon="location" /></ScreenFrame> : recommendations;
 
   const normalizedSalonSearch = salonSearchQuery.trim().toLowerCase();
+  const availableSalonRecords = styleSalonRecords ?? salonRecords;
   const filteredSalonRecords = normalizedSalonSearch
-    ? salonRecords.filter(salon => [salon.name, salon.address, salon.city, salon.phone].some(value => value?.toLowerCase().includes(normalizedSalonSearch)))
-    : salonRecords;
+    ? availableSalonRecords.filter(salon => [salon.name, salon.address, salon.city, salon.phone].some(value => value?.toLowerCase().includes(normalizedSalonSearch)))
+    : availableSalonRecords;
   const mappedSalons = salonRecords.flatMap(salon => salon.latitude != null && salon.longitude != null ? [{ id: salon.id, name: salon.name, address: salon.address, latitude: salon.latitude, longitude: salon.longitude, profileImageUrl: getApiAssetUrl(salon.profileImageUrl) }] : []);
   const filteredMappedSalons = filteredSalonRecords.flatMap(salon => salon.latitude != null && salon.longitude != null ? [{ id: salon.id, name: salon.name, address: salon.address, latitude: salon.latitude, longitude: salon.longitude, profileImageUrl: getApiAssetUrl(salon.profileImageUrl) }] : []);
   const salons = <ScreenFrame><Header title="Nasugbu salons" onBack={() => setScreen('home')} action="options-outline" /><View style={s.salonSearch}><Ionicons name="search" size={20} color={C.muted} /><TextInput accessibilityLabel="Search Nasugbu salons" value={salonSearchQuery} onChangeText={setSalonSearchQuery} placeholder="Search salon, address, or city" placeholderTextColor="#A89DA0" returnKeyType="search" clearButtonMode="while-editing" style={s.salonSearchInput} />{salonSearchQuery.length > 0 && Platform.OS !== 'ios' && <Pressable accessibilityRole="button" accessibilityLabel="Clear salon search" hitSlop={8} onPress={() => setSalonSearchQuery('')} style={({ pressed }) => [s.searchClear, pressed && s.pressed]}><Ionicons name="close-circle" size={20} color={C.muted} /></Pressable>}</View><View style={s.segment}><Pressable onPress={() => setSalonView('list')} style={salonView === 'list' ? s.segmentActive : s.segmentItem}><Ionicons name="list" size={17} color={salonView === 'list' ? C.rose : C.muted} /><Text style={salonView === 'list' ? s.segmentText : s.small}>List</Text></Pressable><Pressable onPress={() => setSalonView('map')} style={salonView === 'map' ? s.segmentActive : s.segmentItem}><Ionicons name="map-outline" size={17} color={salonView === 'map' ? C.rose : C.muted} /><Text style={salonView === 'map' ? s.segmentText : s.small}>Map</Text></Pressable></View>{salonsLoading ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : salonsError ? <Pressable onPress={loadSalons} style={s.dataState}><Text style={s.cardTitle}>Unable to reach the FaceFit API</Text><Text style={s.small}>{salonsError} · Tap to retry</Text></Pressable> : filteredSalonRecords.length === 0 ? <View style={s.dataState}><Ionicons name="search-outline" size={30} color={C.rose} /><Text style={s.cardTitle}>{normalizedSalonSearch ? 'No matching salons' : 'No salons found'}</Text><Text style={s.small}>{normalizedSalonSearch ? `Try another search for “${salonSearchQuery.trim()}”.` : 'Run npm run db:init in the server directory.'}</Text>{normalizedSalonSearch && <Pressable accessibilityRole="button" onPress={() => setSalonSearchQuery('')} style={s.clearSearchButton}><Text style={s.link}>Clear search</Text></Pressable>}</View> : salonView === 'map' ? <><SalonMap salons={filteredMappedSalons} onSelectSalon={salonId => { const salon = filteredSalonRecords.find(item => item.id === salonId); if (salon) void openSalon(salon); }} />{filteredMappedSalons.length === 0 && <View style={s.mapNotice}><Ionicons name="location-outline" size={21} color={C.rose} /><Text style={s.small}>The matching salons do not have verified map coordinates yet.</Text></View>}<Text style={s.mapAttribution}>Showing {filteredSalonRecords.length} salon{filteredSalonRecords.length === 1 ? '' : 's'} · Map data © OpenStreetMap contributors</Text></> : filteredSalonRecords.map(salon => { const favorite = favoriteSalonIds.includes(salon.id); const busy = savingFavoriteSalonIds.includes(salon.id); return <Pressable key={salon.id} onPress={() => void openSalon(salon)} style={s.listCard}><View style={s.salonSquare}>{salon.profileImageUrl ? <Image accessibilityLabel={`${salon.name} profile picture`} source={{ uri: getApiAssetUrl(salon.profileImageUrl)! }} style={s.salonSquareImage} /> : <Ionicons name="cut" size={28} color={C.rose} />}</View><View style={{ flex: 1 }}><Text style={s.cardTitle}>{salon.name}</Text><Text style={s.small}>{salon.address}</Text><Text style={s.small}>{salon.phone || salon.city}</Text></View><Pressable accessibilityRole="checkbox" accessibilityState={{ checked: favorite, busy }} accessibilityLabel={`${favorite ? 'Remove' : 'Add'} ${salon.name} ${favorite ? 'from' : 'to'} favorites`} hitSlop={8} onPress={event => { event.stopPropagation(); toggleFavoriteSalon(salon.id); }} style={({ pressed }) => [s.listFavorite, favorite && s.favoriteButtonActive, pressed && s.favoritePressed]}><FavoriteIcon active={favorite} busy={busy} /></Pressable><Ionicons name="chevron-forward" size={20} color={C.muted} /></Pressable>; })}</ScreenFrame>;
@@ -1002,7 +1036,13 @@ export default function FaceFitPrototype() {
   const salonHours = selectedSalon?.opening_time
     ? `${selectedSalon.opening_time.slice(0, 5)}${selectedSalon.closing_time ? `–${selectedSalon.closing_time.slice(0, 5)}` : ''}`
     : 'Contact for hours';
+  const suggestedStyleService = selectedRecommendation
+    ? salonServices.find(service => service.name === 'Premium Style Haircut')
+      || salonServices.find(service => /haircut|hair cut|style|cut/i.test(service.name))
+      || salonServices[0]
+    : undefined;
   const salonDetail = <ScreenFrame><Header title="Salon profile" onBack={() => { if (salonDetailReturn === 'nearby-map') { setScreen('home'); setMapVisible(true); } else { setScreen(salonDetailReturn); } }} action="heart-outline" favoriteActive={salonDetailFavorite} actionBusy={salonDetailFavoriteBusy} actionColor={C.rose} onAction={selectedSalon ? () => toggleFavoriteSalon(selectedSalon.id) : undefined} />{selectedSalon ? <>
+    {selectedRecommendation && faceAnalysis && <View style={s.notice}><Ionicons name="sparkles" size={21} color={C.rose} /><View style={s.salonCardGrow}><Text style={s.cardTitle}>Your suggested look: {selectedRecommendation.name}</Text><Text style={s.small}>{selectedRecommendation.score}% match for your {faceAnalysis.faceShape} face shape. Show this recommendation to your stylist.</Text></View></View>}
     <View style={s.salonProfileHero}>
       <SalonLogo name={selectedSalon.name} imageUrl={selectedSalon.profileImageUrl} large />
       <View style={s.salonHeroContent}><Text style={s.salonProfileName}>{selectedSalon.name}</Text><View style={s.salonRatingRow}><Ionicons name="star" size={17} color="#FFD58A" /><Text style={s.salonRatingText}>{salonReviewSummary.count ? salonReviewSummary.average.toFixed(1) : 'New'}</Text><Text style={s.salonHeroMeta}>{salonReviewSummary.count ? `${salonReviewSummary.count} review${salonReviewSummary.count === 1 ? '' : 's'}` : 'Be the first to review'}</Text></View><Text style={s.salonHeroAddress}>{selectedSalon.address} · {selectedSalon.city}</Text></View>
@@ -1017,6 +1057,7 @@ export default function FaceFitPrototype() {
     {salonDetailLoading ? <ActivityIndicator color={C.rose} style={s.dataLoader} /> : <>
       {salonPortfolioImages.length > 0 && <><SectionTitle title="Business portfolio" /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.portfolioGallery}>{salonPortfolioImages.map(image => <View style={s.portfolioCustomerCard} key={image.id}><Image source={{ uri: getApiAssetUrl(image.imageUrl)! }} style={s.portfolioCustomerImage} />{image.caption && <Text numberOfLines={2} style={s.portfolioCaption}>{image.caption}</Text>}</View>)}</ScrollView></>}
       <SectionTitle title="Services & pricing" />
+      {selectedRecommendation && suggestedStyleService && <Pressable onPress={() => { setSelectedService(suggestedStyleService); setScreen('datetime'); }} style={({ pressed }) => [s.salonServiceCard, s.choiceSelected, pressed && s.pressed]}><View style={s.salonServiceIcon}><Ionicons name="sparkles" size={22} color={C.rose} /></View><View style={s.salonCardGrow}><Text style={s.eyebrow}>YOUR FACEFIT SUGGESTION</Text><Text style={s.cardTitle}>{selectedRecommendation.name}</Text><Text numberOfLines={2} style={s.small}>{selectedRecommendation.reason}</Text><Text style={s.small}>Provided under {suggestedStyleService.name}</Text><View style={s.salonServiceMeta}><Text style={s.salonPrice}>₱{suggestedStyleService.price.toLocaleString()}</Text><Text style={s.small}>{suggestedStyleService.duration_minutes} min</Text></View></View><Ionicons name="arrow-forward-circle" size={26} color={C.rose} /></Pressable>}
       {salonServices.length ? <View style={s.salonDetailGrid}>{salonServices.map(service => <Pressable onPress={() => { setSelectedService(service); setScreen('datetime'); }} style={({ pressed }) => [s.salonServiceCard, pressed && s.pressed]} key={service.id}><View style={s.salonServiceIcon}><Ionicons name="cut-outline" size={22} color={C.rose} /></View><View style={s.salonCardGrow}><Text style={s.cardTitle}>{service.name}</Text>{service.description && <Text numberOfLines={2} style={s.small}>{service.description}</Text>}<View style={s.salonServiceMeta}><Text style={s.salonPrice}>₱{service.price.toLocaleString()}</Text><Text style={s.small}>{service.duration_minutes} min</Text></View></View><Ionicons name="arrow-forward-circle" size={26} color={C.rose} /></Pressable>)}</View> : <View style={s.salonEmptyCard}><Ionicons name="cut-outline" size={28} color={C.rose} /><View><Text style={s.cardTitle}>Services coming soon</Text><Text style={s.small}>This salon has not published its menu yet.</Text></View></View>}
 
       <SectionTitle title="Available staff" />
@@ -1030,11 +1071,37 @@ export default function FaceFitPrototype() {
     </>}
   </> : <View style={s.dataState}><Text style={s.cardTitle}>Choose a salon first</Text><Button label="Browse salons" onPress={() => setScreen('salons')} /></View>}</ScreenFrame>;
 
-  const selection = (_kind: 'service' | 'stylist') => <ScreenFrame><Header title="Choose a service" onBack={() => setScreen('salon-detail')} /><View style={s.progress}><View style={[s.progressFill, { width: '50%' }]} /></View><Text style={s.body}>Step 1 of 2 · {selectedSalon?.name}</Text>{salonServices.map(service => <Pressable key={service.id} onPress={() => setSelectedService(service)} style={[s.choiceCard, selectedService?.id === service.id && s.choiceSelected]}><View style={s.choiceIcon}><Ionicons name="cut" size={24} color={C.rose} /></View><View style={{ flex: 1 }}><Text style={s.cardTitle}>{service.name}</Text><Text style={s.small}>₱{service.price.toLocaleString()} · {service.duration_minutes} min</Text></View><Ionicons name={selectedService?.id === service.id ? 'radio-button-on' : 'radio-button-off'} size={22} color={selectedService?.id === service.id ? C.rose : C.muted} /></Pressable>)}<View style={s.bottomSpace} /><Button label="Choose date & time" disabled={!selectedService} onPress={() => setScreen('datetime')} /></ScreenFrame>;
+  const selection = (_kind: 'service' | 'stylist') => <ScreenFrame>
+    <Header title="Book an appointment" onBack={() => setScreen('salon-detail')} />
+    <View style={s.progress}><View style={[s.progressFill, { width: '50%' }]} /></View>
+    <Text style={s.eyebrow}>STEP 1 OF 2</Text>
+    <Text style={s.title}>Choose your service</Text>
+    <Text style={s.body}>{selectedSalon?.name} · Select one service to continue.</Text>
+    {selectedRecommendation && <View style={s.notice}><Ionicons name="sparkles" size={22} color={C.rose} /><View style={s.salonCardGrow}><Text style={s.cardTitle}>{selectedRecommendation.name}</Text><Text style={s.small}>FaceFit selected Premium Style Haircut for this look. You can choose another service below.</Text></View></View>}
+    <View style={s.salonDetailGrid}>
+      {salonServices.map(service => {
+        const selected = selectedService?.id === service.id;
+        const faceFitPick = Boolean(selectedRecommendation && service.id === suggestedStyleService?.id);
+        return <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected }} key={service.id} onPress={() => setSelectedService(service)} style={({ pressed }) => [s.choiceCard, selected && s.choiceSelected, pressed && s.pressed]}>
+          <View style={s.choiceIcon}><Ionicons name={faceFitPick ? 'sparkles' : 'cut'} size={24} color={C.rose} /></View>
+          <View style={s.salonCardGrow}>
+            {faceFitPick && <Text style={s.eyebrow}>FACEFIT PICK</Text>}
+            <Text style={s.cardTitle}>{service.name}</Text>
+            {service.description && <Text numberOfLines={2} style={s.small}>{service.description}</Text>}
+            <View style={s.salonServiceMeta}><Text style={s.salonPrice}>₱{service.price.toLocaleString()}</Text><Text style={s.small}>{service.duration_minutes} min</Text></View>
+          </View>
+          <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={25} color={selected ? C.rose : C.muted} />
+        </Pressable>;
+      })}
+    </View>
+    <View style={s.bottomSpace} />
+    {selectedService && <View style={s.notice}><Ionicons name="checkmark-circle" size={22} color={C.rose} /><View style={s.salonCardGrow}><Text style={s.cardTitle}>{selectedService.name} selected</Text><Text style={s.small}>₱{selectedService.price.toLocaleString()} · {selectedService.duration_minutes} minutes</Text></View></View>}
+    <Button label="Continue to date & time" disabled={!selectedService} onPress={() => setScreen('datetime')} icon="arrow-forward" />
+  </ScreenFrame>;
 
   const datetime = <ScreenFrame><Header title="Date & time" onBack={() => setScreen('service')} /><View style={s.progress}><View style={[s.progressFill, { width: '100%' }]} /></View><Text style={s.body}>Step 2 of 2</Text><View style={s.monthRow}><Pressable disabled={calendarMonth <= new Date(today.getFullYear(), today.getMonth(), 1)} onPress={() => setCalendarMonth(month => new Date(month.getFullYear(), month.getMonth() - 1, 1))} style={calendarMonth <= new Date(today.getFullYear(), today.getMonth(), 1) && s.disabledControl}><Ionicons name="chevron-back" size={22} color={C.muted} /></Pressable><Text style={s.sectionTitle}>{calendarMonth.toLocaleDateString([], { month: 'long', year: 'numeric' })}</Text><Pressable onPress={() => setCalendarMonth(month => new Date(month.getFullYear(), month.getMonth() + 1, 1))}><Ionicons name="chevron-forward" size={22} color={C.muted} /></Pressable></View><View style={s.calendar}>{['M','T','W','T','F','S','S'].map((label, index) => <View key={`${label}${index}`} style={s.day}><Text style={s.calendarWeekday}>{label}</Text></View>)}{calendarDays.map((day, index) => { if (day === null) return <View key={`blank${index}`} style={s.day} />; const date = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day); const key = toDateKey(date); const disabled = date < today; const active = selectedDate === key; return <Pressable accessibilityRole="button" accessibilityState={{ disabled, selected: active }} disabled={disabled} onPress={() => { setSelectedDate(key); setSelectedTime(null); }} key={key} style={[s.day, active && s.dayActive]}><Text style={[s.dayText, disabled && s.dayTextDisabled, active && s.dayTextActive]}>{day}</Text></Pressable>; })}</View><SectionTitle title="Available times" />{!selectedDate && <Text style={s.body}>Select an available date first.</Text>}<View style={s.timeGrid}>{timeOptions.map(option => { const disabled = !selectedDate || isTimePast(option.value); const active = selectedTime === option.value; return <Pressable disabled={disabled} onPress={() => setSelectedTime(option.value)} style={[s.time, active && s.timeActive, disabled && s.timeDisabled]} key={option.value}><Text style={[s.chipText, active && s.timeTextActive, disabled && s.dayTextDisabled]}>{option.label}</Text></Pressable>; })}</View><Button label="Review booking" disabled={!selectedService || !selectedDate || !selectedTime} onPress={() => setScreen('summary')} /></ScreenFrame>;
 
-  const summary = <ScreenFrame><Header title="Review booking" onBack={() => setScreen('datetime')} /><View style={s.summaryCard}>{selectedSalon && <SalonLogo name={selectedSalon.name} imageUrl={selectedSalon.profileImageUrl} />}<Text style={s.title}>{selectedSalon?.name}</Text><Text style={s.body}>{selectedService?.name}</Text><View style={s.divider} />{[['calendar',selectedDateLabel],['time',`${selectedTimeLabel} · ${selectedService?.duration_minutes || 0} min`],['person',selectedStylist?.name || 'Any available professional'],['location',selectedSalon?.address || 'Nasugbu, Batangas']].map(x => <View style={s.summaryRow} key={x[0]}><Ionicons name={x[0] as keyof typeof Ionicons.glyphMap} size={21} color={C.rose} /><Text style={s.cardTitle}>{x[1]}</Text></View>)}<View style={s.divider} /><View style={s.sectionHead}><Text style={s.cardTitle}>Estimated total</Text><Text style={s.price}>₱{selectedService?.price.toLocaleString()}</Text></View></View><View style={s.notice}><Ionicons name="information-circle" size={21} color={C.rose} /><Text style={s.small}>Starter prices are estimates. Confirm final pricing with the salon.</Text></View>{bookingError && <View style={s.authError}><Text style={s.authErrorText}>{bookingError}</Text></View>}<Button label={bookingLoading ? 'Confirming…' : 'Confirm booking'} disabled={!selectedService || !selectedDate || !selectedTime || bookingLoading} onPress={() => void confirmBooking()} /></ScreenFrame>;
+  const summary = <ScreenFrame><Header title="Review booking" onBack={() => setScreen('datetime')} /><Text style={s.eyebrow}>ALMOST DONE</Text><Text style={s.title}>Confirm your appointment</Text><View style={s.summaryCard}>{selectedSalon && <SalonLogo name={selectedSalon.name} imageUrl={selectedSalon.profileImageUrl} />}<Text style={s.title}>{selectedSalon?.name}</Text><Text style={s.body}>{selectedService?.name}</Text>{selectedRecommendation && <View style={s.notice}><Ionicons name="sparkles" size={20} color={C.rose} /><View style={s.salonCardGrow}><Text style={s.cardTitle}>{selectedRecommendation.name}</Text><Text style={s.small}>Your FaceFit hairstyle recommendation will be shared with the salon.</Text></View></View>}<View style={s.divider} />{[['calendar',selectedDateLabel],['time',`${selectedTimeLabel} · ${selectedService?.duration_minutes || 0} min`],['person',selectedStylist?.name || 'Any available professional'],['location',selectedSalon?.address || 'Nasugbu, Batangas']].map(x => <View style={s.summaryRow} key={x[0]}><Ionicons name={x[0] as keyof typeof Ionicons.glyphMap} size={21} color={C.rose} /><Text style={s.cardTitle}>{x[1]}</Text></View>)}<View style={s.divider} /><View style={s.sectionHead}><Text style={s.cardTitle}>Estimated total</Text><Text style={s.price}>₱{selectedService?.price.toLocaleString()}</Text></View></View><View style={s.notice}><Ionicons name="information-circle" size={21} color={C.rose} /><Text style={s.small}>Starter prices are estimates. Confirm final pricing with the salon.</Text></View>{bookingError && <View style={s.authError}><Text style={s.authErrorText}>{bookingError}</Text></View>}<Button label={bookingLoading ? 'Confirming…' : 'Confirm booking'} disabled={!selectedService || !selectedDate || !selectedTime || bookingLoading} onPress={() => void confirmBooking()} icon="checkmark-circle" /></ScreenFrame>;
 
   const success = <ScreenFrame scroll={false}><View style={s.centerPage}><View style={s.successIcon}><Ionicons name="checkmark" size={52} color={C.white} /></View><Text style={s.display}>{"You're booked!"}</Text><Text style={[s.body, s.centerText]}>Your appointment at {selectedSalon?.name} was saved.</Text><View style={s.ticket}><Text style={s.eyebrow}>{selectedDateLabel.toUpperCase()} · {selectedTimeLabel.toUpperCase()}</Text><Text style={s.title}>{selectedService?.name}</Text><Text style={s.body}>Status: pending confirmation</Text></View><Button label="View my bookings" onPress={() => setScreen('bookings')} /><Button label="Back to home" onPress={() => setScreen('home')} secondary /></View></ScreenFrame>;
 

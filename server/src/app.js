@@ -771,7 +771,7 @@ app.patch('/api/owner/bookings/:bookingId', authenticate, async (request, respon
 app.get('/api/account/:section', authenticate, async (request, response, next) => {
   const queries = {
     saved: `SELECT id, hairstyle_name AS title, saved_at AS createdAt FROM saved_hairstyles WHERE user_id = ? ORDER BY saved_at DESC`,
-    salons: `SELECT fs.id, s.id AS salonId, s.name AS title, s.address AS detail, fs.created_at AS createdAt FROM favorite_salons fs JOIN salons s ON s.id = fs.salon_id WHERE fs.user_id = ? ORDER BY fs.created_at DESC`,
+    salons: `SELECT fs.salon_id AS id, s.id AS salonId, s.name AS title, s.address AS detail, fs.created_at AS createdAt FROM favorite_salons fs JOIN salons s ON s.id = fs.salon_id WHERE fs.user_id = ? ORDER BY fs.created_at DESC`,
     notifications: `SELECT n.id, n.title, n.message AS detail, n.destination, n.reference_id AS referenceId,
                            CASE WHEN n.destination = 'reviews' THEN r.salon_id ELSE NULL END AS salonId,
                            n.is_read AS isRead, n.created_at AS createdAt
@@ -887,15 +887,19 @@ app.get('/api/salons', async (request, response, next) => {
   response.set('Cache-Control', 'no-store');
   try {
     const search = String(request.query.search || '').trim();
+    const hairstyle = String(request.query.hairstyle || '').trim();
     const pattern = `%${search}%`;
     const [salons] = await pool.execute(
-      `SELECT id, name, description, address, city, latitude, longitude,
-              phone, website, profile_image_path AS profileImageUrl,
-              source, source_url, rating, opening_time, closing_time
-       FROM salons
-       WHERE is_active = TRUE AND (? = '' OR name LIKE ? OR city LIKE ?)
-       ORDER BY rating DESC, name ASC`,
-      [search, pattern, pattern],
+      `SELECT DISTINCT s.id, s.name, s.description, s.address, s.city, s.latitude, s.longitude,
+              s.phone, s.website, s.profile_image_path AS profileImageUrl,
+              s.source, s.source_url, s.rating, s.opening_time, s.closing_time
+       FROM salons s
+       LEFT JOIN salon_hairstyles sh ON sh.salon_id = s.id
+       WHERE s.is_active = TRUE
+         AND (? = '' OR s.name LIKE ? OR s.city LIKE ?)
+         AND (? = '' OR sh.hairstyle_name = ?)
+       ORDER BY s.rating DESC, s.name ASC`,
+      [search, pattern, pattern, hairstyle, hairstyle],
     );
     response.json({ data: salons });
   } catch (error) {
