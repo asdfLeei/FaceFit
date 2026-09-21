@@ -444,8 +444,11 @@ export async function getSalonServices(salonId: number) {
   return response.data;
 }
 
-export async function getSalonStaff(salonId: number) {
-  const response = await apiRequest<{ data: SalonStaff[] }>(`/api/salons/${salonId}/staff`);
+export async function getSalonStaff(salonId: number, appointmentAt?: string, serviceId?: number) {
+  const query = appointmentAt && serviceId
+    ? `?appointmentAt=${encodeURIComponent(appointmentAt)}&serviceId=${serviceId}`
+    : '';
+  const response = await apiRequest<{ data: SalonStaff[] }>(`/api/salons/${salonId}/staff${query}`);
   return response.data;
 }
 

@@ -922,14 +922,34 @@ app.get('/api/salons/:salonId/services', async (request, response, next) => {
 
 app.get('/api/salons/:salonId/staff', async (request, response, next) => {
   try {
+    const { appointmentAt, serviceId } = request.query;
+    const hasSlot = Boolean(appointmentAt && serviceId);
+    const slotDate = hasSlot ? new Date(String(appointmentAt).replace(' ', 'T')) : null;
+    if (hasSlot && (Number.isNaN(slotDate.getTime()) || !Number.isInteger(Number(serviceId)))) {
+      return response.status(400).json({ error: 'Choose a valid appointment time and service.' });
+    }
     const [staff] = await pool.execute(
       `SELECT st.id, u.full_name AS name, st.specialties, st.is_available AS isAvailable,
               st.image_path AS imageUrl
        FROM stylists st
        JOIN users u ON u.id = st.user_id
        WHERE st.salon_id = ? AND st.is_available = TRUE AND st.deleted_at IS NULL
+         ${hasSlot ? `AND EXISTS (
+           SELECT 1 FROM services requested
+           WHERE requested.id = ? AND requested.salon_id = st.salon_id AND requested.is_active = TRUE
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM bookings b
+           JOIN services booked_service ON booked_service.id = b.service_id
+           JOIN services requested ON requested.id = ?
+           WHERE b.stylist_id = st.id AND b.status IN ('pending', 'confirmed')
+             AND b.appointment_at < DATE_ADD(?, INTERVAL requested.duration_minutes MINUTE)
+             AND DATE_ADD(b.appointment_at, INTERVAL booked_service.duration_minutes MINUTE) > ?
+         )` : ''}
        ORDER BY u.full_name`,
-      [request.params.salonId],
+      hasSlot
+        ? [request.params.salonId, Number(serviceId), Number(serviceId), appointmentAt, appointmentAt]
+        : [request.params.salonId],
     );
     response.json({ data: staff });
   } catch (error) {
