@@ -87,6 +87,7 @@ type AuthResponse = { data: { user: AuthUser; token: string } };
 export type Booking = {
   id: number;
   appointmentAt: string;
+  queuePosition: number | null;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   notes: string | null;
   serviceId: number;
@@ -124,6 +125,7 @@ export type OwnerDashboard = {
 export type OwnerBooking = {
   id: number;
   appointmentAt: string;
+  queuePosition: number | null;
   status: Booking['status'];
   notes: string | null;
   serviceName: string;
@@ -510,5 +512,5 @@ export async function createBooking(token: string, input: { serviceId: number; s
   });
   const result = await response.json().catch(() => null);
   if (!response.ok) throw new Error(result?.error || `API request failed (${response.status})`);
-  return result.data as { id: number; status: string };
+  return result.data as { id: number; status: string; queuePosition: number; appointmentAt: string };
 }
