@@ -80,7 +80,9 @@ The default `EXPO_PUBLIC_API_URL=auto` setting lets Expo Go use the computer tha
 npm install
 npm start
 ```
-
+how to run  the server api
+cd /c/Users/acer/FaceFit/server
+npm run dev
 After Expo starts, you can:
 
 - Scan the QR code with Expo Go on a phone.
@@ -128,7 +130,7 @@ After the first setup, start each required service in a separate terminal:
 
 ```bash
 # Terminal 1: API
-cd FaceFit/server
+cd /c/Users/acer/FaceFit/server
 npm run dev
 
 # Terminal 2: Expo app

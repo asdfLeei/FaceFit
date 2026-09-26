@@ -420,7 +420,17 @@ app.get('/api/owner/management', authenticate, async (request, response, next) =
       [salon.id],
     );
     const [bookings] = await pool.execute(
-      `SELECT b.id, b.appointment_at AS appointmentAt, b.status, b.notes,
+      `SELECT b.id, b.appointment_at AS appointmentAt,
+              CASE WHEN b.status IN ('pending', 'confirmed') THEN (
+                SELECT COUNT(*) FROM bookings queued
+                JOIN services queued_sv ON queued_sv.id = queued.service_id
+                WHERE queued_sv.salon_id = sv.salon_id
+                  AND queued.status IN ('pending', 'confirmed')
+                  AND DATE(queued.appointment_at) = DATE(b.appointment_at)
+                  AND (queued.appointment_at < b.appointment_at
+                    OR (queued.appointment_at = b.appointment_at AND queued.id <= b.id))
+              ) ELSE NULL END AS queuePosition,
+              b.status, b.notes,
               sv.name AS serviceName, sv.price, sv.duration_minutes AS durationMinutes,
               customer.full_name AS customerName, customer.email AS customerEmail,
               customer.phone AS customerPhone, stylist.full_name AS stylistName
@@ -430,7 +440,7 @@ app.get('/api/owner/management', authenticate, async (request, response, next) =
        LEFT JOIN stylists st ON st.id = b.stylist_id
        LEFT JOIN users stylist ON stylist.id = st.user_id
        WHERE sv.salon_id = ?
-       ORDER BY FIELD(b.status, 'pending', 'confirmed', 'completed', 'cancelled'), b.appointment_at DESC`,
+      ORDER BY FIELD(b.status, 'pending', 'confirmed', 'completed', 'cancelled'), b.appointment_at ASC, b.id ASC`,
       [salon.id],
     );
     const [reviews] = await pool.execute(
@@ -760,7 +770,7 @@ app.patch('/api/owner/bookings/:bookingId', authenticate, async (request, respon
     await pool.execute('UPDATE bookings SET status = ? WHERE id = ?', [status, bookingId]);
     await pool.execute(
       'INSERT INTO notifications (user_id, title, message, destination, reference_id) VALUES (?, ?, ?, ?, ?)',
-      [booking.userId, `Booking ${status}`, `${booking.salonName} marked your appointment as ${status}.`, 'bookings', bookingId],
+      [booking.userId, `Queue ${status}`, `${booking.salonName} marked your queue entry as ${status}.`, 'bookings', bookingId],
     );
     return response.json({ data: { id: bookingId, status } });
   } catch (error) {
@@ -1083,7 +1093,17 @@ app.put('/api/reviews/:reviewId', authenticate, async (request, response, next) 
 app.get('/api/bookings', authenticate, async (request, response, next) => {
   try {
     const [bookings] = await pool.execute(
-      `SELECT b.id, b.appointment_at AS appointmentAt, b.status, b.notes,
+      `SELECT b.id, b.appointment_at AS appointmentAt,
+              CASE WHEN b.status IN ('pending', 'confirmed') THEN (
+                SELECT COUNT(*) + 1 FROM bookings queued
+                JOIN services queued_sv ON queued_sv.id = queued.service_id
+                WHERE queued_sv.salon_id = sv.salon_id
+                  AND queued.status IN ('pending', 'confirmed')
+                  AND DATE(queued.appointment_at) = DATE(b.appointment_at)
+                  AND (queued.appointment_at < b.appointment_at
+                    OR (queued.appointment_at = b.appointment_at AND queued.id < b.id))
+              ) ELSE NULL END AS queuePosition,
+              b.status, b.notes,
               sv.id AS serviceId, sv.name AS serviceName, sv.price,
               sv.duration_minutes AS durationMinutes,
               sa.id AS salonId, sa.name AS salonName,
@@ -1105,17 +1125,15 @@ app.get('/api/bookings', authenticate, async (request, response, next) => {
 
 app.post('/api/bookings', authenticate, async (request, response, next) => {
   const { serviceId, stylistId = null, appointmentAt, notes = null } = request.body;
-  if (!serviceId || !appointmentAt) {
-    return response.status(400).json({ error: 'serviceId and appointmentAt are required.' });
-  }
+  if (!serviceId || !appointmentAt) return response.status(400).json({ error: 'serviceId and appointmentAt are required.' });
   const appointmentDate = new Date(String(appointmentAt).replace(' ', 'T'));
   if (Number.isNaN(appointmentDate.getTime()) || appointmentDate <= new Date()) {
-    return response.status(400).json({ error: 'Choose an appointment date and time in the future.' });
+    return response.status(400).json({ error: 'Choose a possible date and time in the future.' });
   }
 
   try {
     const [bookingOptions] = await pool.execute(
-      `SELECT sv.id, sv.name AS serviceName, s.name AS salonName, s.owner_id AS ownerId,
+      `SELECT sv.id, sv.name AS serviceName, s.id AS salonId, s.name AS salonName, s.owner_id AS ownerId,
               u.full_name AS customerName
        FROM services sv JOIN salons s ON s.id = sv.salon_id
        JOIN users u ON u.id = ?
@@ -1144,17 +1162,26 @@ app.post('/api/bookings', authenticate, async (request, response, next) => {
     );
     await pool.execute(
       `INSERT INTO notifications (user_id, title, message, destination, reference_id)
-       VALUES (?, 'Booking submitted', ?, 'bookings', ?)`,
-      [request.user.sub, `${bookingDetails.salonName} received your ${bookingDetails.serviceName} appointment request.`, result.insertId],
+      VALUES (?, 'Queue joined', ?, 'bookings', ?)`,
+          [request.user.sub, `You joined the ${bookingDetails.salonName} queue for ${bookingDetails.serviceName}.`, result.insertId],
     );
     if (bookingDetails.ownerId) {
       await pool.execute(
         `INSERT INTO notifications (user_id, title, message, destination, reference_id)
-         VALUES (?, 'New booking request', ?, 'owner-bookings', ?)`,
-        [bookingDetails.ownerId, `${bookingDetails.customerName} requested ${bookingDetails.serviceName}.`, result.insertId],
+         VALUES (?, 'New queue member', ?, 'owner-bookings', ?)`,
+        [bookingDetails.ownerId, `${bookingDetails.customerName} joined the queue for ${bookingDetails.serviceName}.`, result.insertId],
       );
     }
-    return response.status(201).json({ data: { id: result.insertId, status: 'pending' } });
+    const [[queue]] = await pool.execute(
+      `SELECT COUNT(*) + 1 AS queuePosition
+       FROM bookings queued
+       JOIN services queued_sv ON queued_sv.id = queued.service_id
+       WHERE queued_sv.salon_id = ? AND queued.status IN ('pending', 'confirmed')
+         AND DATE(queued.appointment_at) = DATE(?)
+         AND (queued.appointment_at < ? OR (queued.appointment_at = ? AND queued.id < ?))`,
+      [bookingDetails.salonId, appointmentAt, appointmentAt, appointmentAt, result.insertId],
+    );
+    return response.status(201).json({ data: { id: result.insertId, status: 'pending', queuePosition: Number(queue.queuePosition), appointmentAt } });
   } catch (error) {
     return next(error);
   }

@@ -1,21 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import * as Location from "expo-location";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
-import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { FaceScanScreen } from "@/components/face-scan-screen";
-import { FaceLandmarkOverlay } from "@/components/face-landmark-overlay";
 import { CustomerDashboardScreen } from "@/components/dashboards/customer-dashboard-screen";
 import { OwnerDashboardScreen } from "@/components/dashboards/owner-dashboard-screen";
 import { OwnerSalonSetupScreen } from "@/components/dashboards/owner-salon-setup-screen";
+import { FaceLandmarkOverlay } from "@/components/face-landmark-overlay";
+import { FaceScanScreen } from "@/components/face-scan-screen";
 import { LocationMap, type MapCoordinate } from "@/components/location-map";
 import { OnboardingScreen } from "@/components/onboarding-screen";
 import { CustomerSettingsScreen } from "@/components/profile/customer-settings-screen";
-import { SalonMap } from "@/components/salon-map";
 import { SalonLocationPicker } from "@/components/salon-location-picker";
+import { SalonMap } from "@/components/salon-map";
 import {
+  analyzeFace,
   createBooking,
   createOwnerPortfolioImage,
   createOwnerReviewReply,
@@ -54,6 +48,7 @@ import {
   type AccountItem,
   type AuthUser,
   type Booking,
+  type FaceAnalysis,
   type OwnerDashboard,
   type OwnerManagement,
   type PortfolioImage,
@@ -63,9 +58,14 @@ import {
   type SalonService,
   type SalonStaff,
   type UserProfile,
-  analyzeFace,
-  type FaceAnalysis,
 } from "@/services/api";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import { StatusBar } from "expo-status-bar";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -546,6 +546,22 @@ function Art({
           quadrant === 3 && s.q3,
         ]}
       />
+    </View>
+  );
+}
+
+function HairstylePreview({ name, faceUri, height = 150 }: { name: string; faceUri?: string | null; height?: number }) {
+  return (
+    <View style={[s.hairstylePreview, { height }]}>
+      {faceUri ? (
+        <Image accessibilityLabel={`Your face preview for ${name}`} source={{ uri: faceUri }} style={s.tryOnFace} />
+      ) : (
+        <Art height={height} quadrant={0} />
+      )}
+      <View style={s.hairstylePreviewLabel}>
+        <Ionicons name="cut-outline" size={15} color={C.white} />
+        <Text numberOfLines={1} style={s.overlayText}>{faceUri ? `AI preview placeholder · ${name}` : name}</Text>
+      </View>
     </View>
   );
 }
@@ -1641,6 +1657,7 @@ export default function FaceFitPrototype() {
   const [staffPickerVisible, setStaffPickerVisible] = useState(false);
   const [staffPickerLoading, setStaffPickerLoading] = useState(false);
   const [lastBookingId, setLastBookingId] = useState<number | null>(null);
+  const [lastQueuePosition, setLastQueuePosition] = useState<number | null>(null);
   const back = (fallback: Screen = "home") => setScreen(fallback);
   const mainScreens = [
     "home",
@@ -2407,11 +2424,12 @@ export default function FaceFitPrototype() {
           : undefined,
       });
       setLastBookingId(booking.id);
+      setLastQueuePosition(booking.queuePosition);
       await loadBookings();
       setScreen("success");
     } catch (error) {
       setBookingError(
-        error instanceof Error ? error.message : "Unable to create booking.",
+        error instanceof Error ? error.message : "Unable to join the queue.",
       );
     } finally {
       setBookingLoading(false);
@@ -2926,6 +2944,7 @@ export default function FaceFitPrototype() {
   ) => (
     <Pressable onPress={() => { setSelectedRecommendation(item); setScreen("style-detail"); }} style={s.recCard} key={`${item.audience}-${item.name}`}>
       <View style={s.matchBadge}><Text style={s.matchText}>{item.score}% match</Text></View>
+      <HairstylePreview name={item.name} faceUri={uploaded} />
       <View style={s.recBody}><View style={s.sectionHead}><Text style={s.cardTitle}>{item.name}</Text><Ionicons name="chevron-forward" size={20} color={C.rose} /></View><Text style={s.small}>{item.reason}</Text></View>
     </Pressable>
   );
@@ -3042,6 +3061,7 @@ export default function FaceFitPrototype() {
           <Text style={s.scoreText}>{selectedRecommendation.score}</Text>
         </View>
       </View>
+      <HairstylePreview name={selectedRecommendation.name} faceUri={uploaded} height={230} />
       <Text style={s.sectionTitle}>Why it suits you</Text>
       <Text style={s.body}>{selectedRecommendation.reason}</Text>
       <View style={s.chipRow}>
@@ -3961,7 +3981,7 @@ export default function FaceFitPrototype() {
         </View>
       )}
       <Button
-        label="Continue to date & time"
+        label="Continue to queue"
         disabled={!selectedService}
         onPress={() => setScreen("datetime")}
         icon="arrow-forward"
@@ -3972,11 +3992,20 @@ export default function FaceFitPrototype() {
   const datetime = (
     <>
     <ScreenFrame>
-      <Header title="Date & time" onBack={() => setScreen("service")} />
+      <Header title="Date & time for queue" onBack={() => setScreen("service")} />
       <View style={s.progress}>
         <View style={[s.progressFill, { width: "100%" }]} />
       </View>
       <Text style={s.body}>Step 2 of 2</Text>
+      <View style={s.notice}>
+        <Ionicons name="people" size={24} color={C.rose} />
+        <View style={s.salonCardGrow}>
+          <Text style={s.cardTitle}>Join the salon queue</Text>
+          <Text style={s.small}>
+            Choose a possible date and time. You will see your queue position for that schedule.
+          </Text>
+        </View>
+      </View>
       <View style={s.monthRow}>
         <Pressable
           disabled={
@@ -4053,9 +4082,9 @@ export default function FaceFitPrototype() {
           );
         })}
       </View>
-      <SectionTitle title="Available times" />
+      <SectionTitle title="Possible times" />
       {!selectedDate && (
-        <Text style={s.body}>Select an available date first.</Text>
+        <Text style={s.body}>Select a date first to see possible queue times.</Text>
       )}
       <View style={s.timeGrid}>
         {timeOptions.map((option) => {
@@ -4095,13 +4124,8 @@ export default function FaceFitPrototype() {
         </Text>
       )}
       <Button
-        label="Review booking"
-        disabled={
-          !selectedService ||
-          !selectedDate ||
-          !selectedTime ||
-          (salonStaff.length > 0 && !selectedStylist)
-        }
+        label="Review queue entry"
+        disabled={!selectedService || !selectedDate || !selectedTime || (salonStaff.length > 0 && !selectedStylist)}
         onPress={() => setScreen("summary")}
       />
     </ScreenFrame>
@@ -4120,9 +4144,9 @@ export default function FaceFitPrototype() {
 
   const summary = (
     <ScreenFrame>
-      <Header title="Review booking" onBack={() => setScreen("datetime")} />
+      <Header title="Review queue entry" onBack={() => setScreen("datetime")} />
       <Text style={s.eyebrow}>ALMOST DONE</Text>
-      <Text style={s.title}>Confirm your appointment</Text>
+      <Text style={s.title}>Confirm joining the queue</Text>
       <View style={s.summaryCard}>
         {selectedSalon && (
           <SalonLogo
@@ -4147,10 +4171,7 @@ export default function FaceFitPrototype() {
         <View style={s.divider} />
         {[
           ["calendar", selectedDateLabel],
-          [
-            "time",
-            `${selectedTimeLabel} · ${selectedService?.duration_minutes || 0} min`,
-          ],
+          ["time", `${selectedTimeLabel} · ${selectedService?.duration_minutes || 0} min`],
           ["person", selectedStylist?.name || "Any available professional"],
           ["location", selectedSalon?.address || "Nasugbu, Batangas"],
         ].map((x) => (
@@ -4177,16 +4198,20 @@ export default function FaceFitPrototype() {
           Starter prices are estimates. Confirm final pricing with the salon.
         </Text>
       </View>
+      <View style={s.notice}>
+        <Ionicons name="people" size={21} color={C.rose} />
+        <Text style={s.small}>
+          Your queue position will be calculated for this date and time.
+        </Text>
+      </View>
       {bookingError && (
         <View style={s.authError}>
           <Text style={s.authErrorText}>{bookingError}</Text>
         </View>
       )}
       <Button
-        label={bookingLoading ? "Confirming…" : "Confirm booking"}
-        disabled={
-          !selectedService || !selectedDate || !selectedTime || bookingLoading
-        }
+        label={bookingLoading ? "Joining…" : "Join queue"}
+        disabled={!selectedService || !selectedDate || !selectedTime || bookingLoading}
         onPress={() => void confirmBooking()}
         icon="checkmark-circle"
       />
@@ -4199,28 +4224,25 @@ export default function FaceFitPrototype() {
         <View style={s.successIcon}>
           <Ionicons name="checkmark" size={52} color={C.white} />
         </View>
-        <Text style={s.display}>{"You're booked!"}</Text>
+        <Text style={s.display}>You're in the queue!</Text>
         <Text style={[s.body, s.centerText]}>
-          Your appointment at {selectedSalon?.name} was saved.
+          You joined the queue at {selectedSalon?.name}.
         </Text>
         <View style={s.ticket}>
           <Text style={s.eyebrow}>
-            {selectedDateLabel.toUpperCase()} ·{" "}
-            {selectedTimeLabel.toUpperCase()}
+            QUEUE ENTRY · {selectedDateLabel.toUpperCase()} · {selectedTimeLabel.toUpperCase()}
           </Text>
           <Text style={s.title}>{selectedService?.name}</Text>
           <Text style={s.body}>
             {selectedStylist?.name || "Any available professional"}
           </Text>
-          <Text style={s.body}>Status: pending confirmation</Text>
+          <Text style={s.body}>
+            Queue position: {lastQueuePosition ? `#${lastQueuePosition}` : "calculating"}
+          </Text>
+          <Text style={s.body}>Estimated service time: {selectedTimeLabel}</Text>
         </View>
         <Button
-          label="Download appointment proof"
-          onPress={() => void downloadAppointmentProof()}
-          icon="download-outline"
-        />
-        <Button
-          label="View my bookings"
+          label="View my queue entries"
           onPress={() => setScreen("bookings")}
           secondary
         />
@@ -4236,7 +4258,7 @@ export default function FaceFitPrototype() {
   const bookings = (
     <ScreenFrame>
       <Header
-        title="My bookings"
+        title="My queue entries"
         action="notifications-outline"
         onAction={() => showNotifications("bookings")}
         actionBadge={notificationUnreadCount}
@@ -4246,24 +4268,25 @@ export default function FaceFitPrototype() {
       ) : bookingsError ? (
         <Pressable onPress={() => void loadBookings()} style={s.dataState}>
           <Ionicons name="cloud-offline-outline" size={28} color={C.rose} />
-          <Text style={s.cardTitle}>Could not load bookings</Text>
+          <Text style={s.cardTitle}>Could not load queue entries</Text>
           <Text style={s.small}>{bookingsError} · Tap to retry</Text>
         </Pressable>
       ) : bookingRecords.length === 0 ? (
         <View style={s.empty}>
           <Ionicons name="calendar-outline" size={40} color="#CDBEC2" />
-          <Text style={s.cardTitle}>No appointments yet</Text>
+          <Text style={s.cardTitle}>You have not joined a queue yet</Text>
           <Text style={s.small}>
-            Bookings you make with a salon will appear here.
+            Queue entries you make with a salon will appear here.
           </Text>
         </View>
       ) : (
         bookingRecords.map((booking) => (
           <View style={s.bookingCard} key={booking.id}>
             <Text style={s.eyebrow}>
-              {new Date(booking.appointmentAt)
-                .toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
-                .toUpperCase()}
+              {booking.queuePosition ? `QUEUE POSITION ${booking.queuePosition}` : booking.status.toUpperCase()}
+            </Text>
+            <Text style={s.small}>
+              Possible service time: {new Date(booking.appointmentAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
             </Text>
             <Text style={s.title}>{booking.serviceName}</Text>
             <Text style={s.body}>
@@ -4642,7 +4665,7 @@ export default function FaceFitPrototype() {
     page: Exclude<Screen, "owner-dashboard" | "owner-notifications">,
   ) => {
     const titles: Partial<Record<Screen, string>> = {
-      "owner-bookings": "Booking requests",
+      "owner-bookings": "Salon queue",
       "owner-services": "Services & pricing",
       "owner-staff": "Staff management",
       "owner-profile": "Business profile",
@@ -4671,12 +4694,9 @@ export default function FaceFitPrototype() {
               <View style={s.ownerCardTop}>
                 <View style={s.salonCardGrow}>
                   <Text style={s.eyebrow}>
-                    {new Date(booking.appointmentAt)
-                      .toLocaleString([], {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })
-                      .toUpperCase()}
+                    {booking.queuePosition
+                      ? `QUEUE POSITION ${booking.queuePosition}`
+                      : booking.status.toUpperCase()}
                   </Text>
                   <Text style={s.title}>{booking.customerName}</Text>
                 </View>
@@ -4704,7 +4724,7 @@ export default function FaceFitPrototype() {
                     label={
                       ownerBookingUpdating === booking.id
                         ? "Updating…"
-                        : "Confirm"
+                        : "Start service"
                     }
                     disabled={ownerBookingUpdating !== null}
                     onPress={() =>
@@ -4727,7 +4747,7 @@ export default function FaceFitPrototype() {
                     label={
                       ownerBookingUpdating === booking.id
                         ? "Updating…"
-                        : "Mark completed"
+                        : "Complete service"
                     }
                     disabled={ownerBookingUpdating !== null}
                     onPress={() =>
@@ -4749,9 +4769,9 @@ export default function FaceFitPrototype() {
         ) : (
           <View style={s.empty}>
             <Ionicons name="calendar-outline" size={40} color="#CDBEC2" />
-            <Text style={s.cardTitle}>No client bookings yet</Text>
+            <Text style={s.cardTitle}>No customers in the queue yet</Text>
             <Text style={s.small}>
-              Appointments booked from the Teves client page will appear here.
+              Customers who join the queue will appear here in order.
             </Text>
           </View>
         );
@@ -6374,6 +6394,29 @@ const s = StyleSheet.create({
     marginBottom: 14,
     borderWidth: 1,
     borderColor: C.line,
+  },
+  hairstylePreview: {
+    width: "100%",
+    overflow: "hidden",
+    backgroundColor: C.blush,
+  },
+  tryOnFace: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  hairstylePreviewLabel: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 11,
+    backgroundColor: "rgba(41,35,38,.82)",
   },
   recBody: { padding: 14, paddingTop: 50 },
   matchBadge: {
